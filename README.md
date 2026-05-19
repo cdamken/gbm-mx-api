@@ -1,7 +1,7 @@
 # gbm-mx-api
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
 Cliente Python **no oficial** para la API interna de **GBM+**, la casa de bolsa
@@ -208,4 +208,4 @@ de brokers en otros mercados (US, EU, India) — adaptado al stack mexicano.
 
 ## Licencia
 
-[MIT](LICENSE) — uso libre con atribución.
+[Business Source License 1.1](LICENSE). Uso personal, educativo e interno permitido sin restricciones; ofrecer el código como servicio comercial competitivo requiere acuerdo aparte. El 2030-05-19 se convierte automáticamente en Apache 2.0.

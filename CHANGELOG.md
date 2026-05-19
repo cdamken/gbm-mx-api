@@ -6,6 +6,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-05-19
+
+### Changed — license
+
+- License changed from **MIT** to **Business Source License 1.1** (SPDX
+  `BUSL-1.1`). Personal, educational and internal use remain permitted
+  without restriction; offering the Licensed Work as a hosted or embedded
+  competitive service requires a separate agreement.
+- Change Date: `2030-05-19`. On that date, this version auto-relicenses to
+  Apache License 2.0.
+- Versions `0.1.0` and `0.1.1` were released under MIT and remain so —
+  this change applies to `0.1.2` and onward.
+
+No code changes; the license update is the only difference vs `0.1.1`.
+
 ## [0.1.1] — 2026-05-19
 
 ### Added — multi-account position support
@@ -102,6 +117,7 @@ continue to work identically.
 - Python 3.10+.
 - Dependencias mínimas: `httpx`, `pydantic`. CLI extras: `typer`, `rich`.
 
-[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.2
 [0.1.1]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.1
 [0.1.0]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.0
