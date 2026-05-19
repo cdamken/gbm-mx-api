@@ -57,10 +57,16 @@ class AccountType(str):
 
 
 class PositionValueType(IntEnum):
-    """Section identifier inside the position summary payload."""
+    """Section identifier inside the position summary payload.
+
+    Values are inferred from real responses across different account types.
+    Add new ones here if a future account surfaces a different value.
+    """
 
     SIC = 0
     BMV = 1
+    COMUN = 2  # Sociedades de inversión común (e.g. GBMAAA BO)
     DEUDA = 5  # Sociedades de inversión de deuda (fondos)
     EFECTIVO = 27
+    EXTRANJERO = 100  # Trading USA — fractional shares of foreign equities
     TOTAL = 1000

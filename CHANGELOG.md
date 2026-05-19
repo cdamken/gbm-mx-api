@@ -6,6 +6,38 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-05-19
+
+### Added — multi-account position support
+
+Discovered via probing during dashboard work that `GetPositionSummary`
+accepts an extra `accountId` (UUID) field. With it, the endpoint also
+returns positions for non-primary accounts (Asesor, Trading USA) and
+exposes two new sections that didn't appear in the primary-account
+response.
+
+**API changes:**
+- `Positions.summary(legacy_account_id, account_id=...)` — new optional
+  `account_id` parameter. Send the `Account.account_id` UUID to get
+  full holdings for Asesor / Trading USA accounts.
+- `PortfolioSummary` model — two new fields:
+  - `sociedades_inversion_comun` (alias `sociedadesInversionComun`) —
+    mutual funds (e.g. GBMAAA BO). Surfaces on Asesor accounts.
+  - `mercado_extranjero` (alias `mercadoExtranjero`) — USA fractional
+    shares. Surfaces on `trading_usa` accounts.
+- `PortfolioSummary.real_positions` now includes the two new sections.
+- `PositionValueType` enum — added members:
+  - `COMUN = 2` (sociedades de inversión común)
+  - `EXTRANJERO = 100` (mercado extranjero / fractional shares)
+
+Backwards compatible: existing callers that don't pass `account_id`
+continue to work identically.
+
+### Tests
+
+- 2 new tests covering the `account_id` parameter and the new sections.
+- 62 total tests passing.
+
 ## [0.1.0] — 2026-05-19
 
 ### Added — primera versión alpha funcional
@@ -70,5 +102,6 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 - Python 3.10+.
 - Dependencias mínimas: `httpx`, `pydantic`. CLI extras: `typer`, `rich`.
 
-[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.1
 [0.1.0]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.0

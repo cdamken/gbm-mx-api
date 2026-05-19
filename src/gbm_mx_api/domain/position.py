@@ -57,19 +57,25 @@ class PortfolioSummary(BaseModel):
     sociedades_inversion_deuda: list[Position] = Field(
         default_factory=list, alias="sociedadesInversionDeuda"
     )
+    sociedades_inversion_comun: list[Position] = Field(
+        default_factory=list, alias="sociedadesInversionComun"
+    )
+    mercado_extranjero: list[Position] = Field(default_factory=list, alias="mercadoExtranjero")
     efectivo: list[Position] = Field(default_factory=list)
     total_portfolio_value: list[Position] = Field(default_factory=list, alias="totalPortfolioValue")
 
     # --- helpers -------------------------------------------------------
     @property
     def real_positions(self) -> list[Position]:
-        """All non-subtotal positions across SIC + BMV + funds."""
+        """All non-subtotal investment positions (excludes cash and totals)."""
         return [
             p
             for section in (
                 self.mercados_globales_sic,
                 self.mercado_capitales,
                 self.sociedades_inversion_deuda,
+                self.sociedades_inversion_comun,
+                self.mercado_extranjero,
             )
             for p in section
             if not p.is_subtotal

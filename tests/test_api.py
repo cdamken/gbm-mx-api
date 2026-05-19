@@ -106,6 +106,91 @@ def test_positions_summary(http: HttpClient) -> None:
     assert len(s.real_positions) == 2
 
 
+@respx.mock
+def test_positions_summary_sends_account_id_when_provided(http: HttpClient) -> None:
+    """Asesor + Trading USA require accountId; the primary trading account
+    works without. Ensure the body shape varies accordingly."""
+    captured: dict[str, object] = {}
+
+    def _capture(request: httpx.Request) -> httpx.Response:
+        import json as _json
+
+        captured["body"] = _json.loads(request.content.decode())
+        return httpx.Response(200, json=POSITION_SUMMARY_RESPONSE)
+
+    respx.post("https://homebroker-api.gbm.com/GBMP/api/Portfolio/GetPositionSummary").mock(
+        side_effect=_capture
+    )
+
+    Positions(http).summary(LEGACY_ID, account_id="acct-uuid-1")
+
+    body = captured["body"]
+    assert isinstance(body, dict)
+    assert body == {"request": LEGACY_ID, "accountId": "acct-uuid-1"}
+
+
+@respx.mock
+def test_positions_summary_parses_new_sections(http: HttpClient) -> None:
+    """The model accepts mercado_extranjero (USA) and sociedades_inversion_comun
+    (Asesor) sections discovered in v0.1.1."""
+    extended_response = {
+        "mercadosGlobalesSIC": [],
+        "mercadoCapitales": [],
+        "sociedadesInversionDeuda": [],
+        "sociedadesInversionComun": [
+            {
+                "positionValueType": 2,
+                "issueId": "GBMAAA BO",
+                "issueName": "GBM INSTRUMENTOS BURSATILES",
+                "instrumentType": 28,
+                "quantity": 10325.0,
+                "averagePrice": 1.934,
+                "lastPrice": 2.069,
+                "closePrice": 2.069,
+                "weightedAveragePrice": 0.0,
+                "yieldValue": 1401.0,
+                "marketValue": 21364.0,
+                "dailyVariationPercentage": 0.0,
+                "historicalVariationPercentage": 0.07,
+                "averageCost": 19963.0,
+                "positionPercentage": 0.2,
+            }
+        ],
+        "mercadoExtranjero": [
+            {
+                "positionValueType": 100,
+                "issueId": "DRAM",
+                "issueName": "Some fractional ETF",
+                "instrumentType": 100,
+                "quantity": 456.679,
+                "averagePrice": 871.9,
+                "lastPrice": 834.07,
+                "closePrice": 852.21,
+                "weightedAveragePrice": 0.0,
+                "yieldValue": -17281.4,
+                "marketValue": 380901.0,
+                "dailyVariationPercentage": -0.02,
+                "historicalVariationPercentage": -0.04,
+                "averageCost": 398182.4,
+                "positionPercentage": 1.0,
+            }
+        ],
+        "efectivo": [],
+        "totalPortfolioValue": [],
+    }
+    respx.post("https://homebroker-api.gbm.com/GBMP/api/Portfolio/GetPositionSummary").mock(
+        return_value=httpx.Response(200, json=extended_response)
+    )
+
+    s = Positions(http).summary(LEGACY_ID, account_id="acct-uuid-1")
+    assert len(s.sociedades_inversion_comun) == 1
+    assert s.sociedades_inversion_comun[0].issue_id == "GBMAAA BO"
+    assert len(s.mercado_extranjero) == 1
+    assert s.mercado_extranjero[0].issue_id == "DRAM"
+    # real_positions includes the new sections.
+    assert len(s.real_positions) == 2
+
+
 # ----------------------------------------------------------------------
 # Orders
 # ----------------------------------------------------------------------
