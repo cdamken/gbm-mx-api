@@ -33,7 +33,14 @@ class Order(BaseModel):
     account_id: str = Field(alias="accountId", description="e.g. 'EP47NC05'.")
     issue_id: str = Field(alias="issueId", description="Ticker / instrument code.")
     instrument_type: InstrumentType = Field(alias="instrumentType")
-    status: OrderStatus = Field(alias="gbmIntProcessStatus", description="Order status enum.")
+    status: int = Field(
+        alias="gbmIntProcessStatus",
+        description=(
+            "Raw GBM order status code. Known values: "
+            "5=Cancelada, 7=Llena. Other ints come from the backend "
+            "(pending, partially-filled, etc.) and are accepted as-is."
+        ),
+    )
     bit_buy: bool = Field(alias="bitBuy", description="True=buy, false=sell.")
     original_quantity: int = Field(alias="originalQuantity")
     assigned_quantity: int = Field(alias="assignedQuantity")
@@ -60,7 +67,24 @@ class Order(BaseModel):
 
     @property
     def is_filled(self) -> bool:
-        return self.status.is_filled
+        return self.status == OrderStatus.FILLED.value
+
+    @property
+    def is_cancelled(self) -> bool:
+        return self.status == OrderStatus.CANCELLED.value
+
+    @property
+    def status_label(self) -> str:
+        """Spanish-friendly label for the status code.
+
+        Known: 5=Cancelada, 7=Llena. Unknown statuses surface as
+        ``"Estado N"`` so the UI can still show something instead of
+        crashing.
+        """
+        try:
+            return OrderStatus(self.status).name.title()
+        except ValueError:
+            return f"Estado {self.status}"
 
     def to_filled(self) -> FilledOrder:
         """Project to :class:`FilledOrder`.

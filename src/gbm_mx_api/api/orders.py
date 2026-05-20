@@ -13,7 +13,7 @@ import time
 from collections.abc import Iterator
 
 from gbm_mx_api.api._base import ApiBase
-from gbm_mx_api.domain.enums import InstrumentType, OrderStatus
+from gbm_mx_api.domain.enums import InstrumentType
 from gbm_mx_api.domain.order import FilledOrder, Order
 from gbm_mx_api.errors import ApiError
 
@@ -87,6 +87,52 @@ class Orders(ApiBase):
             )
         return [Order.model_validate(item) for item in raw_orders]
 
+    def list_for_range(
+        self,
+        legacy_account_id: str,
+        from_date: _dt.date,
+        to_date: _dt.date,
+        *,
+        instrument_types: tuple[InstrumentType, ...] | None = None,
+    ) -> list[Order]:
+        """Raw orders (any status) submitted in ``[from_date, to_date]``.
+
+        Iterates per-day because the backend's ``GetBlotterOrders`` only
+        accepts one ``processDate`` at a time. De-duplicates by ``sob_id``.
+
+        Args:
+            legacy_account_id: e.g. ``"EP47NC05"``.
+            from_date: First day, inclusive.
+            to_date: Last day, inclusive.
+            instrument_types: Defaults to BMV + SIC.
+        """
+        if from_date > to_date:
+            raise ValueError("from_date must be <= to_date")
+
+        seen_ids: set[int] = set()
+        results: list[Order] = []
+        days_done = 0
+
+        for day in _daterange(from_date, to_date):
+            try:
+                day_orders = self.list_for_day(
+                    legacy_account_id, day, instrument_types=instrument_types
+                )
+            except ApiError:
+                raise
+            for order in day_orders:
+                if order.sob_id in seen_ids:
+                    continue
+                seen_ids.add(order.sob_id)
+                results.append(order)
+
+            days_done += 1
+            if days_done % _PAUSE_EVERY == 0:
+                time.sleep(_PAUSE_SECONDS)
+
+        results.sort(key=lambda o: (o.process_date, o.sob_id))
+        return results
+
     def list_filled(
         self,
         legacy_account_id: str,
@@ -122,7 +168,7 @@ class Orders(ApiBase):
             except ApiError:
                 raise  # surface to caller; they can decide to retry/skip
             for order in day_orders:
-                if order.status is not OrderStatus.FILLED:
+                if not order.is_filled:
                     continue
                 if order.sob_id in seen_ids:
                     continue

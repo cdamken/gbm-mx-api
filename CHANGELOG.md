@@ -6,6 +6,32 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-05-20
+
+### Added
+
+- `Orders.list_for_range(legacy_id, from_date, to_date)` — returns every
+  order (any status) submitted in the range, not just filled ones.
+  Same per-day iteration + dedupe behavior as `list_filled`.
+- `Order.is_cancelled` — convenience property mirroring `is_filled`.
+- `Order.status_label` — Spanish-friendly label for the status code.
+  Returns `"Filled"`, `"Cancelled"`, or `"Estado N"` for unknowns.
+
+### Changed
+
+- `Order.status` is now a plain `int` instead of a strict `OrderStatus`
+  enum. Parsing no longer fails when GBM returns an unknown status code
+  (e.g. partially-filled, pending). The previously-known values
+  (5=Cancelada, 7=Llena) still work as expected via `is_filled` /
+  `is_cancelled` / `status_label`. **Breaking** for callers that did
+  `order.status is OrderStatus.FILLED`; use `order.is_filled` or compare
+  against `OrderStatus.FILLED.value` instead.
+
+### Tests
+
+- 64 total (was 62) — 2 new tests covering unknown status values and
+  `status_label`.
+
 ## [0.1.2] — 2026-05-19
 
 ### Changed — license
@@ -117,7 +143,8 @@ continue to work identically.
 - Python 3.10+.
 - Dependencias mínimas: `httpx`, `pydantic`. CLI extras: `typer`, `rich`.
 
-[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.3
 [0.1.2]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.2
 [0.1.1]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.1
 [0.1.0]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.0
