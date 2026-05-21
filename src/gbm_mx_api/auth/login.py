@@ -82,11 +82,25 @@ def start_login(
         latitude = latitude or lat
         longitude = longitude or lon
 
-    with HttpClient(latitude=latitude, longitude=longitude) as http:
-        body = http.post(
-            LOGIN_URL,
-            json={"clientid": client_id, "user": email, "password": password},
-        )
+    try:
+        with HttpClient(latitude=latitude, longitude=longitude) as http:
+            body = http.post(
+                LOGIN_URL,
+                json={"clientid": client_id, "user": email, "password": password},
+            )
+    except ApiError as e:
+        # GBM returns HTTP 422 NotAuthorizedException for bad credentials,
+        # not the conventional 401. Reclassify so callers (and the
+        # dashboard UI) can treat it as an auth failure rather than a
+        # generic API error.
+        if _looks_like_auth_failure(e):
+            raise AuthError(
+                _auth_error_message(e),
+                status_code=e.status_code,
+                body=e.body,
+                request_id=e.request_id,
+            ) from e
+        raise
 
     if not isinstance(body, dict):
         raise ApiError(
@@ -129,17 +143,29 @@ def complete_mfa(
         latitude = latitude or lat
         longitude = longitude or lon
 
-    with HttpClient(latitude=latitude, longitude=longitude) as http:
-        body = http.post(
-            CHALLENGE_URL,
-            json={
-                "clientid": client_id,
-                "user": challenge.user,
-                "session": challenge.session,
-                "code": code,
-                "challengeType": challenge.challenge_type,
-            },
-        )
+    try:
+        with HttpClient(latitude=latitude, longitude=longitude) as http:
+            body = http.post(
+                CHALLENGE_URL,
+                json={
+                    "clientid": client_id,
+                    "user": challenge.user,
+                    "session": challenge.session,
+                    "code": code,
+                    "challengeType": challenge.challenge_type,
+                },
+            )
+    except ApiError as e:
+        # GBM also returns 422 NotAuthorizedException when the TOTP code
+        # is wrong or expired.
+        if _looks_like_auth_failure(e):
+            raise AuthError(
+                _auth_error_message(e),
+                status_code=e.status_code,
+                body=e.body,
+                request_id=e.request_id,
+            ) from e
+        raise
 
     if not isinstance(body, dict) or "accessToken" not in body:
         raise AuthError(
@@ -203,6 +229,32 @@ def login(
 # ----------------------------------------------------------------------
 # Internals
 # ----------------------------------------------------------------------
+# Known GBM error IDs that mean "credentials / TOTP rejected" — we treat
+# these as AuthError so callers can react with a re-login UI instead of
+# a generic API failure dialog.
+_AUTH_FAILURE_IDS = frozenset({"NotAuthorizedException", "InvalidParameterException"})
+
+
+def _looks_like_auth_failure(error: ApiError) -> bool:
+    """True if an ApiError from auth.gbm.com is really an auth failure.
+
+    GBM uses HTTP 422 with id=NotAuthorizedException for wrong
+    credentials and wrong/expired TOTP codes — not the conventional 401.
+    """
+    if not isinstance(error.body, dict):
+        return False
+    return error.body.get("id") in _AUTH_FAILURE_IDS
+
+
+def _auth_error_message(error: ApiError) -> str:
+    """Best human-friendly message we can pull from a GBM auth error body."""
+    if isinstance(error.body, dict):
+        msg = error.body.get("message")
+        if isinstance(msg, str) and msg.strip():
+            return msg
+    return "Credentials rejected by GBM."
+
+
 def _session_from_response(
     body: dict[str, Any],
     client_id: str,

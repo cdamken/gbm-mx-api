@@ -82,6 +82,31 @@ def test_start_login_401_raises_auth_error() -> None:
 
 
 @respx.mock
+def test_start_login_422_not_authorized_raises_auth_error() -> None:
+    """GBM returns 422 NotAuthorizedException for wrong credentials —
+    we should classify it as an AuthError, not a generic ApiError."""
+    respx.post(LOGIN_URL).mock(
+        return_value=httpx.Response(
+            422,
+            json={
+                "code": 214,
+                "id": "NotAuthorizedException",
+                "message": "Verifica tu correo y contraseña.",
+            },
+        )
+    )
+    with pytest.raises(AuthError) as ei:
+        start_login(
+            "carlos@example.com",
+            "wrong-password",
+            latitude=19.4326,
+            longitude=-99.1332,
+        )
+    assert "Verifica" in str(ei.value)
+    assert ei.value.status_code == 422
+
+
+@respx.mock
 def test_complete_mfa_returns_session() -> None:
     respx.post(CHALLENGE_URL).mock(
         return_value=httpx.Response(

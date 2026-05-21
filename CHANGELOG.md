@@ -6,6 +6,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-05-21
+
+### Changed
+
+- `start_login` and `complete_mfa` now translate GBM's HTTP 422
+  `NotAuthorizedException` into an `AuthError` instead of a generic
+  `ApiError`. GBM uses 422 (not the conventional 401) for wrong
+  credentials and wrong/expired TOTP codes; catching this lets callers
+  show a "reauthenticate" UI instead of a scary "API failed" message.
+- The `AuthError` raised in this case preserves GBM's Spanish message
+  (e.g. *"Verifica tu correo y contraseña."*) so the UI can show it
+  verbatim.
+
+### Tests
+
+- 1 new test covering the 422 → AuthError reclassification (65 total).
+
 ## [0.1.3] — 2026-05-20
 
 ### Added
@@ -143,7 +160,8 @@ continue to work identically.
 - Python 3.10+.
 - Dependencias mínimas: `httpx`, `pydantic`. CLI extras: `typer`, `rich`.
 
-[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.4
 [0.1.3]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.3
 [0.1.2]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.2
 [0.1.1]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.1
