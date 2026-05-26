@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
 
@@ -229,6 +230,87 @@ def orders_ls(
         )
     console.print(table)
     console.print(f"\n[bold]{len(filled)} filled orders[/]")
+
+
+# ---------------------------------------------------------------------------
+# dividends
+# ---------------------------------------------------------------------------
+dividends_app = typer.Typer(no_args_is_help=True, help="Dividend / cash-distribution operations.")
+app.add_typer(dividends_app, name="dividends")
+
+
+@dividends_app.command("ls")
+def dividends_ls(
+    since: Annotated[str, typer.Option("--since", help="Start date YYYY-MM-DD (inclusive).")],
+    until: Annotated[
+        str | None,
+        typer.Option("--until", help="End date YYYY-MM-DD (inclusive). Defaults to today."),
+    ] = None,
+    legacy_id: Annotated[
+        str | None,
+        typer.Option("--legacy-id", help="Override the trading legacy id."),
+    ] = None,
+    include_isr: Annotated[
+        bool,
+        typer.Option(
+            "--include-isr/--no-isr",
+            help="Include ISR withholding rows alongside payouts.",
+        ),
+    ] = True,
+    session_path: SessionPath = str(DEFAULT_SESSION_PATH),
+    output_json: Annotated[
+        bool, typer.Option("--json", help="Output as JSON instead of a table.")
+    ] = False,
+) -> None:
+    """List dividend / cash-distribution movements in a date range."""
+    from_date = _parse_date(since)
+    to_date = _parse_date(until) if until else _dt.date.today()
+
+    with get_client(session_path) as client:
+        main = client.contracts.get_main()
+        if legacy_id is None:
+            trading = client.accounts.get_trading(main.contract_id)
+            legacy_id = trading.legacy_contract_id
+        items = client.dividends.list_for_range(main.contract_id, legacy_id, from_date, to_date)
+    if not include_isr:
+        items = [d for d in items if not d.is_withholding]
+
+    if output_json:
+        rows = [d.model_dump(mode="json") for d in items]
+        typer.echo(json.dumps(rows, indent=2, ensure_ascii=False, default=str))
+        return
+
+    table = Table(title=f"Dividends {from_date} → {to_date}")
+    table.add_column("Date")
+    table.add_column("Ticker")
+    table.add_column("Description")
+    table.add_column("Kind")
+    table.add_column("Gross", justify="right")
+    table.add_column("Net", justify="right")
+    table.add_column("ID")
+    net_total = Decimal("0")
+    tax_total = Decimal("0")
+    for d in items:
+        kind = "ISR" if d.is_withholding else "Abono"
+        table.add_row(
+            d.process_date.date().isoformat(),
+            d.security_id,
+            d.transaction_description,
+            kind,
+            f"{d.transaction_amount:,.2f}",
+            f"{d.transaction_net_amount:,.2f}",
+            str(d.transaction_id),
+        )
+        if d.is_withholding:
+            tax_total += d.transaction_amount
+        else:
+            net_total += d.transaction_net_amount
+    console.print(table)
+    console.print(
+        f"\n[bold]{len(items)} movements[/] · "
+        f"net received: [green]{net_total:,.2f}[/] · "
+        f"ISR withheld: [red]{tax_total:,.2f}[/]"
+    )
 
 
 # ---------------------------------------------------------------------------

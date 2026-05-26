@@ -1,7 +1,7 @@
 # gbm-mx-api
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE)
+[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
 [![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
 Cliente Python **no oficial** para la API interna de **GBM+**, la casa de bolsa
@@ -29,6 +29,9 @@ gbm-mx orders ls --since 2026-04-01
   ninguna otra librería pública para GBM expone hoy.
 - **Posiciones actuales del portafolio** con P&L por instrumento.
 - **Cuentas / estrategias** del contrato (Trading MX, Trading USA, Smart Cash).
+- **Dividendos y movimientos en efectivo** (cash dividends, reembolsos de
+  capital, ISR retenido, "resultado fiscal distribuido") con paginación
+  transparente.
 - **Sync incremental a un `Portfolio.md`** propio — agrega solo órdenes nuevas,
   deduplicadas por ID de orden.
 
@@ -69,7 +72,11 @@ gbm-mx positions
 # 4. Listar órdenes llenas de un rango
 gbm-mx orders ls --since 2026-04-01 --until 2026-05-19
 
-# 5. Sincronizar tu Portfolio.md (dry-run primero para previsualizar)
+# 5. Listar dividendos recibidos en el rango (incluye ISR retenido por
+#    default; usa --no-isr si solo quieres los abonos)
+gbm-mx dividends ls --since 2026-01-01
+
+# 6. Sincronizar tu Portfolio.md (dry-run primero para previsualizar)
 gbm-mx sync /ruta/a/Portfolio.md --since 2026-04-01 --dry-run
 gbm-mx sync /ruta/a/Portfolio.md --since 2026-04-01
 ```
@@ -132,12 +139,13 @@ Los logs en modo debug redactan automáticamente tokens y campos sensibles.
 
 ## Estado y alcance
 
-**v0.1.0** — Alpha funcional. Cubre:
+**v0.1.6** — Alpha funcional. Cubre:
 
 - ✅ Login completo (incluido 2FA TOTP).
-- ✅ Lectura: contratos, cuentas, posiciones, blotter de órdenes con histórico.
-- ✅ CLI con 5 subcomandos incluyendo `sync`.
-- ✅ 60 tests pasando, mypy strict, ruff verde.
+- ✅ Lectura: contratos, cuentas, posiciones, blotter de órdenes con histórico,
+  dividendos / movimientos en efectivo.
+- ✅ CLI con 6 subcomandos incluyendo `sync` y `dividends`.
+- ✅ 71 tests pasando, mypy strict, ruff verde.
 
 **Limitaciones conocidas de v0.1:**
 
@@ -152,7 +160,6 @@ Los logs en modo debug redactan automáticamente tokens y campos sensibles.
 **Roadmap v0.2+:**
 
 - Refresh token.
-- Movimientos de efectivo (`/cash-transactions`).
 - Export a OFX / CSV (formato Sharesight).
 - Estados de cuenta PDF.
 - Esquema fiscal mexicano (ISR, IVA, DOF) para constancias SAT.
@@ -168,7 +175,8 @@ Ver [CHANGELOG.md](CHANGELOG.md).
 | Modelos tipados (Pydantic v2) | ❌ | ✅ |
 | `py.typed` marker | ❌ | ✅ |
 | CLI integrado | ❌ | ✅ |
-| Tests | ❌ | ✅ (60) |
+| Tests | ❌ | ✅ (71) |
+| Dividendos / movimientos en efectivo | ❌ | ✅ |
 | Sincronización a `Portfolio.md` | ❌ | ✅ |
 | Redacción de tokens en logs | ❌ | ✅ |
 | Envío de órdenes / transferencias | ✅ | ❌ (planeado) |

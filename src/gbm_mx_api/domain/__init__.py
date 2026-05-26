@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from gbm_mx_api.domain.account import Account, Money
 from gbm_mx_api.domain.contract import Contract
+from gbm_mx_api.domain.dividend import Dividend
 from gbm_mx_api.domain.enums import (
     AccountType,
     InstrumentType,
@@ -20,11 +21,13 @@ from gbm_mx_api.domain.enums import (
 )
 from gbm_mx_api.domain.order import FilledOrder, Order
 from gbm_mx_api.domain.position import PortfolioSummary, Position
+from gbm_mx_api.domain.transaction import Transaction
 
 __all__ = [
     "Account",
     "AccountType",
     "Contract",
+    "Dividend",
     "FilledOrder",
     "InstrumentType",
     "Money",
@@ -34,4 +37,5 @@ __all__ = [
     "Position",
     "PositionValueType",
     "Side",
+    "Transaction",
 ]

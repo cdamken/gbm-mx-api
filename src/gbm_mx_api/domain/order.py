@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -73,18 +74,23 @@ class Order(BaseModel):
     def is_cancelled(self) -> bool:
         return self.status == OrderStatus.CANCELLED.value
 
+    # GBM's UI uses Spanish; keep labels consistent so dashboards / Markdown
+    # reports don't need their own translation table.
+    _STATUS_LABELS_ES: ClassVar[dict[int, str]] = {
+        OrderStatus.CANCELLED.value: "Cancelada",
+        OrderStatus.FILLED.value: "Llena",
+    }
+
     @property
     def status_label(self) -> str:
-        """Spanish-friendly label for the status code.
+        """Spanish label for the status code.
 
-        Known: 5=Cancelada, 7=Llena. Unknown statuses surface as
+        Known: 5 → ``"Cancelada"``, 7 → ``"Llena"``. Unknown statuses surface as
         ``"Estado N"`` so the UI can still show something instead of
         crashing.
         """
-        try:
-            return OrderStatus(self.status).name.title()
-        except ValueError:
-            return f"Estado {self.status}"
+        label = self._STATUS_LABELS_ES.get(self.status)
+        return label if label is not None else f"Estado {self.status}"
 
     def to_filled(self) -> FilledOrder:
         """Project to :class:`FilledOrder`.

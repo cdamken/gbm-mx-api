@@ -79,8 +79,11 @@ def start_login(
     """
     if latitude is None or longitude is None:
         lat, lon = detect_geo()
-        latitude = latitude or lat
-        longitude = longitude or lon
+        # `... or ...` would treat 0.0 (the equator / Greenwich meridian)
+        # as "missing" and overwrite it with detected geo. Test explicit
+        # None instead so 0.0 stays as a valid user-provided value.
+        latitude = lat if latitude is None else latitude
+        longitude = lon if longitude is None else longitude
 
     try:
         with HttpClient(latitude=latitude, longitude=longitude) as http:
@@ -140,8 +143,11 @@ def complete_mfa(
 
     if latitude is None or longitude is None:
         lat, lon = detect_geo()
-        latitude = latitude or lat
-        longitude = longitude or lon
+        # `... or ...` would treat 0.0 (the equator / Greenwich meridian)
+        # as "missing" and overwrite it with detected geo. Test explicit
+        # None instead so 0.0 stays as a valid user-provided value.
+        latitude = lat if latitude is None else latitude
+        longitude = lon if longitude is None else longitude
 
     try:
         with HttpClient(latitude=latitude, longitude=longitude) as http:
@@ -204,8 +210,11 @@ def login(
     """
     if latitude is None or longitude is None:
         lat, lon = detect_geo()
-        latitude = latitude or lat
-        longitude = longitude or lon
+        # `... or ...` would treat 0.0 (the equator / Greenwich meridian)
+        # as "missing" and overwrite it with detected geo. Test explicit
+        # None instead so 0.0 stays as a valid user-provided value.
+        latitude = lat if latitude is None else latitude
+        longitude = lon if longitude is None else longitude
 
     try:
         return start_login(

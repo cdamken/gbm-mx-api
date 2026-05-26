@@ -62,7 +62,16 @@ class Orders(ApiBase):
         *,
         instrument_types: tuple[InstrumentType, ...] | None = None,
     ) -> list[Order]:
-        """Raw orders (all statuses) submitted on ``day``."""
+        """Raw orders (all statuses) submitted on ``day``.
+
+        Note:
+            This endpoint only returns orders for the **primary** trading
+            account of a contract (e.g. ``EP47NC05``). Querying a secondary
+            account (``EP47NC02`` Asesor, ``EP47NC03`` Trading USA) returns
+            an empty list — passing the account UUID does NOT help (backend
+            ignores it). Movements for those accounts live on
+            ``api.appgbm.com/v2/.../transactions`` (see :mod:`gbm_mx_api.api.transactions`).
+        """
         types = instrument_types or self.DEFAULT_INSTRUMENT_TYPES
         body = self._http.post(
             BLOTTER_URL,
@@ -101,7 +110,8 @@ class Orders(ApiBase):
         accepts one ``processDate`` at a time. De-duplicates by ``sob_id``.
 
         Args:
-            legacy_account_id: e.g. ``"EP47NC05"``.
+            legacy_account_id: e.g. ``"EP47NC05"``. Must be the primary
+                trading account — see :meth:`list_for_day` note.
             from_date: First day, inclusive.
             to_date: Last day, inclusive.
             instrument_types: Defaults to BMV + SIC.
@@ -114,12 +124,11 @@ class Orders(ApiBase):
         days_done = 0
 
         for day in _daterange(from_date, to_date):
-            try:
-                day_orders = self.list_for_day(
-                    legacy_account_id, day, instrument_types=instrument_types
-                )
-            except ApiError:
-                raise
+            # Let ApiError propagate — the caller can decide whether to
+            # retry the whole range or skip the day.
+            day_orders = self.list_for_day(
+                legacy_account_id, day, instrument_types=instrument_types
+            )
             for order in day_orders:
                 if order.sob_id in seen_ids:
                     continue
@@ -148,7 +157,8 @@ class Orders(ApiBase):
         (defensive — duplicates should not happen but cost nothing to guard).
 
         Args:
-            legacy_account_id: e.g. ``"EP47NC05"``.
+            legacy_account_id: e.g. ``"EP47NC05"``. Primary trading account
+                only — see :meth:`list_for_day` note.
             from_date: First day, inclusive.
             to_date: Last day, inclusive.
             instrument_types: Defaults to BMV + SIC.
@@ -161,12 +171,11 @@ class Orders(ApiBase):
         days_done = 0
 
         for day in _daterange(from_date, to_date):
-            try:
-                day_orders = self.list_for_day(
-                    legacy_account_id, day, instrument_types=instrument_types
-                )
-            except ApiError:
-                raise  # surface to caller; they can decide to retry/skip
+            # Let ApiError propagate — the caller can decide whether to
+            # retry the whole range or skip the day.
+            day_orders = self.list_for_day(
+                legacy_account_id, day, instrument_types=instrument_types
+            )
             for order in day_orders:
                 if not order.is_filled:
                     continue

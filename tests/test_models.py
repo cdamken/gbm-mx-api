@@ -115,11 +115,11 @@ def test_status_label_known_values() -> None:
     """Known statuses (5/7) get the Spanish name."""
     raw_filled = dict(BLOTTER_TWO_ORDERS["ordersList"][0])
     raw_filled["gbmIntProcessStatus"] = 7
-    assert Order.model_validate(raw_filled).status_label == "Filled"
+    assert Order.model_validate(raw_filled).status_label == "Llena"
 
     raw_cancelled = dict(BLOTTER_TWO_ORDERS["ordersList"][0])
     raw_cancelled["gbmIntProcessStatus"] = 5
-    assert Order.model_validate(raw_cancelled).status_label == "Cancelled"
+    assert Order.model_validate(raw_cancelled).status_label == "Cancelada"
 
 
 # ----------------------------------------------------------------------

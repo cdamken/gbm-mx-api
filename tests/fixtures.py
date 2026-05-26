@@ -138,6 +138,98 @@ def blotter_response(orders: list[dict]) -> dict:
     return {"getRealTimePosition": {}, "ordersList": orders}
 
 
+def dividends_page(items: list[dict], *, page: int, has_next: bool) -> dict:
+    """Build a paginated /v2/trading/.../transactions envelope."""
+    next_link = "?page=2" if has_next else ""
+    return {
+        "items": items,
+        "pagination_metadata": {
+            "total_items": len(items),
+            "page_count": 10,
+            "previous": "",
+            "next": next_link,
+            "page_size": 100,
+            "page": page,
+        },
+    }
+
+
+# Three representative cash-flow rows: a capital return, a cash dividend
+# and the matching ISR withholding line.
+DIVIDENDS_THREE_ITEMS: dict = dividends_page(
+    [
+        {
+            "contract_id": "00000000-0000-4000-8000-000000000001",
+            "legacy_contract_id": "AB12CD05",
+            "security_id": "FMX 23",
+            "quantity": 0.0,
+            "transaction_id": 24286814,
+            "transaction_type": "prestamo_valores",
+            "sub_transaction_type": 266,
+            "transaction_price": 0.0,
+            "transaction_commission": 0.0,
+            "transaction_tax": 0.0,
+            "transaction_interest": 0.0,
+            "transaction_yield_rate": 0.0,
+            "transaction_term": 0.0,
+            "transaction_amount": 14.3604,
+            "transaction_net_amount": 14.3604,
+            "process_date": "2026-05-21T12:54:36+00:00",
+            "settlement_date": "2026-05-21T06:00:00+00:00",
+            "transaction_time": "06:54:36",
+            "transaction_description": "Abono Reembolso de Capital, Cust. Normal",
+            "security_name": "Fibra Infraestructura y Energía México,",
+        },
+        {
+            "contract_id": "00000000-0000-4000-8000-000000000001",
+            "legacy_contract_id": "AB12CD05",
+            "security_id": "PINFRA *",
+            "quantity": 0.0,
+            "transaction_id": 24213655,
+            "transaction_type": "prestamo_valores",
+            "sub_transaction_type": 1,
+            "transaction_price": 0.0,
+            "transaction_commission": 0.0,
+            "transaction_tax": 0.0,
+            "transaction_interest": 0.0,
+            "transaction_yield_rate": 0.0,
+            "transaction_term": 0.0,
+            "transaction_amount": 11.44,
+            "transaction_net_amount": 11.44,
+            "process_date": "2026-05-14T20:53:00+00:00",
+            "settlement_date": "2026-05-14T06:00:00+00:00",
+            "transaction_time": "14:53:00",
+            "transaction_description": "Abono Efectivo Dividendo, Cust. Normal",
+            "security_name": "PROMOTORA Y OPERADORA DE INFRA",
+        },
+        {
+            "contract_id": "00000000-0000-4000-8000-000000000001",
+            "legacy_contract_id": "AB12CD05",
+            "security_id": "PINFRA *",
+            "quantity": 0.0,
+            "transaction_id": 24213656,
+            "transaction_type": "prestamo_valores",
+            "sub_transaction_type": 2,
+            "transaction_price": 0.0,
+            "transaction_commission": 0.0,
+            "transaction_tax": 0.0,
+            "transaction_interest": 0.0,
+            "transaction_yield_rate": 0.0,
+            "transaction_term": 0.0,
+            "transaction_amount": 1.14,
+            "transaction_net_amount": 1.14,
+            "process_date": "2026-05-14T14:00:00+00:00",
+            "settlement_date": "2026-05-14T06:00:00+00:00",
+            "transaction_time": "08:00:00",
+            "transaction_description": "ISR Cedular por Dividendos",
+            "security_name": "PROMOTORA Y OPERADORA DE INFRA",
+        },
+    ],
+    page=1,
+    has_next=False,
+)
+
+
 # A representative day with one FILLED order (status=7) and one CANCELLED (5).
 BLOTTER_TWO_ORDERS: dict = blotter_response(
     [
@@ -206,4 +298,148 @@ BLOTTER_TWO_ORDERS: dict = blotter_response(
             "vigenciaId": 0,
         },
     ]
+)
+
+
+def _tx(
+    transaction_id: int,
+    *,
+    legacy: str = "AB12CD05",
+    ttype: str,
+    sub: int = 0,
+    desc: str,
+    security_id: str = "",
+    amount: float = 0.0,
+    date_iso: str = "2026-05-15T12:00:00+00:00",
+) -> dict:
+    """Build a minimal /transactions item with sane defaults."""
+    return {
+        "contract_id": "00000000-0000-4000-8000-000000000001",
+        "legacy_contract_id": legacy,
+        "security_id": security_id,
+        "security_name": "",
+        "transaction_id": transaction_id,
+        "transaction_type": ttype,
+        "sub_transaction_type": sub,
+        "transaction_description": desc,
+        "transaction_amount": amount,
+        "transaction_net_amount": amount,
+        "quantity": 0.0,
+        "transaction_price": 0.0,
+        "transaction_commission": 0.0,
+        "transaction_tax": 0.0,
+        "transaction_interest": 0.0,
+        "transaction_yield_rate": 0.0,
+        "transaction_term": 0.0,
+        "process_date": date_iso,
+        "settlement_date": None,
+        "transaction_time": date_iso[11:19],
+    }
+
+
+# One row per category to exercise Transaction.category classification.
+TRANSACTIONS_MIXED: dict = dividends_page(
+    [
+        _tx(
+            1001,
+            ttype="capitales",
+            sub=1,
+            desc="Compra de Acciones.",
+            security_id="FMTY 14",
+            amount=29.62,
+            date_iso="2026-05-20T13:00:00+00:00",
+        ),
+        _tx(
+            1002,
+            ttype="capitales",
+            sub=4,
+            desc="Venta de Acciones.",
+            security_id="GBMDINT BO",
+            amount=201224.76,
+            date_iso="2026-05-14T13:00:00+00:00",
+        ),
+        _tx(
+            1003,
+            ttype="mercado_dinero",
+            sub=80,
+            desc="Compra Soc.de Inv.- Cliente",
+            security_id="GBMF2 BF",
+            amount=500.0,
+            date_iso="2026-05-13T13:00:00+00:00",
+        ),
+        _tx(
+            1004,
+            ttype="mercado_dinero",
+            sub=81,
+            desc="Venta Soc.de Inv.- Cliente",
+            security_id="GBMF2 BF",
+            amount=200420.25,
+            date_iso="2026-05-12T13:00:00+00:00",
+        ),
+        _tx(
+            1005,
+            ttype="mercado_dinero",
+            sub=2,
+            desc="Compra en Reporto",
+            security_id="LF 280224",
+            amount=200203.27,
+            date_iso="2026-05-15T13:00:00+00:00",
+        ),
+        _tx(
+            1006,
+            ttype="mercado_dinero",
+            sub=0,
+            desc="Vencimiento de Reporto",
+            security_id="LF 280224",
+            amount=200274.18,
+            date_iso="2026-05-18T13:00:00+00:00",
+        ),
+        _tx(
+            1007,
+            ttype="tesoreria",
+            sub=3534,
+            desc="DEPOSITO DE EFECTIVO POR TRASPASO",
+            security_id="Efectivo",
+            amount=200420.37,
+            date_iso="2026-05-12T13:00:00+00:00",
+        ),
+        _tx(
+            1008,
+            ttype="tesoreria",
+            sub=3535,
+            desc="RETIRO DE EFECTIVO POR TRASPASO",
+            security_id="Efectivo",
+            amount=201224.76,
+            date_iso="2026-05-15T13:00:00+00:00",
+        ),
+        _tx(
+            1009,
+            ttype="divisas",
+            sub=1,
+            desc="Compra",
+            security_id="DOLARES",
+            amount=200221.28,
+            date_iso="2026-05-15T13:00:00+00:00",
+        ),
+        _tx(
+            1010,
+            ttype="prestamo_valores",
+            sub=1,
+            desc="Abono Efectivo Dividendo, Cust. Normal",
+            security_id="PINFRA *",
+            amount=11.44,
+            date_iso="2026-05-14T20:53:00+00:00",
+        ),
+        _tx(
+            1011,
+            ttype="prestamo_valores",
+            sub=2,
+            desc="ISR Cedular por Dividendos",
+            security_id="PINFRA *",
+            amount=1.14,
+            date_iso="2026-05-14T14:00:00+00:00",
+        ),
+    ],
+    page=1,
+    has_next=False,
 )

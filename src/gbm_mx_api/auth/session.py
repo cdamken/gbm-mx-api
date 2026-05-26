@@ -13,11 +13,14 @@ portability; the file should be on a user-only directory.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
 from pathlib import Path
 
 from pydantic import BaseModel, Field
+
+log = logging.getLogger(__name__)
 
 DEFAULT_SESSION_PATH = Path.home() / ".gbm-mx" / "session.json"
 
@@ -93,8 +96,18 @@ class Session(BaseModel):
     @classmethod
     def try_load(cls, path: Path = DEFAULT_SESSION_PATH) -> Session | None:
         """Like :meth:`load`, but returns ``None`` if the file is missing
-        or unreadable."""
+        or unreadable.
+
+        A missing file is the normal "first run" path and stays silent.
+        Anything else (permissions, JSON corruption, schema mismatch from
+        a stale session.json after a model bump) is logged so users have
+        a hint when the CLI says "no session" but actually the file is
+        broken.
+        """
         try:
             return cls.load(path)
-        except (FileNotFoundError, ValueError, OSError):
+        except FileNotFoundError:
+            return None
+        except (ValueError, OSError) as exc:
+            log.warning("session at %s is unreadable: %s", path, exc)
             return None

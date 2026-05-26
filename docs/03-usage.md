@@ -14,6 +14,7 @@ hecha (`pip install "gbm-mx-api[cli]"`).
    - [`gbm-mx accounts ls`](#gbm-mx-accounts-ls)
    - [`gbm-mx positions`](#gbm-mx-positions)
    - [`gbm-mx orders ls`](#gbm-mx-orders-ls)
+   - [`gbm-mx dividends ls`](#gbm-mx-dividends-ls)
    - [`gbm-mx sync`](#gbm-mx-sync)
 3. [Python API](#python-api)
 4. [Variables de entorno](#variables-de-entorno)
@@ -178,6 +179,41 @@ Output (tabla, truncado):
 ```bash
 gbm-mx orders ls --since 2026-05-01 --json | jq '.[] | select(.issue_id == "WDC *")'
 ```
+
+---
+
+### `gbm-mx dividends ls`
+
+Lista los movimientos en efectivo que GBM clasifica como dividendos en el
+rango: dividendos en efectivo, reembolsos de capital, "resultado fiscal
+distribuido" (de fondos), y las retenciones de ISR cedular correspondientes.
+
+```bash
+gbm-mx dividends ls --since 2026-01-01
+```
+
+**Opciones:**
+- `--since YYYY-MM-DD` *(requerido)*
+- `--until YYYY-MM-DD` — default: hoy.
+- `--legacy-id LEGACY_ID` — otra cuenta. Default: trading principal.
+- `--include-isr` / `--no-isr` — incluye o no las filas de ISR retenido.
+  Default: incluidas.
+- `--json` — salida JSON.
+
+El pie de tabla resume **net received** (suma de abonos netos) y
+**ISR withheld** (suma de retenciones).
+
+```bash
+# Solo los abonos que efectivamente entraron a la cuenta (sin ISR):
+gbm-mx dividends ls --since 2026-01-01 --no-isr
+
+# Export JSON:
+gbm-mx dividends ls --since 2026-01-01 --json > divs.json
+```
+
+> ⚠️ Este endpoint vive en `api.appgbm.com` (no `api.gbm.com`). Si el
+> backend rota su autorización podría empezar a devolver 401/403 antes
+> que el resto de la lib — abre un issue si pasa.
 
 ---
 

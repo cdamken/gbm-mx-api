@@ -342,13 +342,100 @@ podríamos pedir más subtipos, no se han mapeado todos.
 
 ---
 
+## Endpoint: `GET /v2/trading/contracts/{contract_id}/transactions` ⭐ (api.appgbm.com)
+
+Descubierto 2026-05-22 husmeando la pestaña "Dividendos" en
+`https://www.appgbm.com/trading/MEX/{LEGACY_ID}` con DevTools. **El host
+es diferente al resto** (`api.appgbm.com` vs `api.gbm.com` /
+`homebroker-api.gbm.com`).
+
+### Request
+
+```
+GET https://api.appgbm.com/v2/trading/contracts/{contract_id}/transactions
+    ?page=1
+    &page_size=100
+    &start_date=2026-01-01
+    &end_date=2026-05-22
+    &transac_type=dividend
+    &legacy_contracts_id=EP47NC05
+```
+
+- **`contract_id`** — UUID del contrato (no el legacy ID).
+- **`legacy_contracts_id`** — sí, plural; sigue siendo el legacy ID típico
+  (`EP47NC05`). El backend hace joins por ambos.
+- **`transac_type=dividend`** — filtro de tipo. Cuando se manda, devuelve
+  todos los movimientos en efectivo que GBM clasifica como dividendos:
+  - `Abono Efectivo Dividendo, Cust. Normal` (dividendo en efectivo).
+  - `Abono Reembolso de Capital, Cust. Normal` (devolución de capital,
+    no tributable como dividendo en MX).
+  - `Abono Efectivo Resultado Fiscal Distribuido` (fondos que distribuyen
+    su utilidad fiscal).
+  - `ISR Cedular por Dividendos` — las retenciones que GBM ya pagó al SAT.
+
+### Response
+
+```json
+{
+  "items": [
+    {
+      "transaction_id": 24286814,
+      "contract_id": "87e24157-…",
+      "legacy_contract_id": "EP47NC05",
+      "security_id": "FMX 23",
+      "security_name": "Fibra Infraestructura y Energía México,",
+      "transaction_type": "prestamo_valores",
+      "sub_transaction_type": 266,
+      "transaction_amount": 14.3604,
+      "transaction_net_amount": 14.3604,
+      "transaction_commission": 0.0,
+      "transaction_tax": 0.0,
+      "process_date": "2026-05-21T12:54:36+00:00",
+      "settlement_date": "2026-05-21T06:00:00+00:00",
+      "transaction_time": "06:54:36",
+      "transaction_description": "Abono Reembolso de Capital, Cust. Normal"
+    }
+  ],
+  "pagination_metadata": {
+    "total_items": 12,
+    "page_count": 10,
+    "previous": "",
+    "next": "?page=2&…",
+    "page_size": 10,
+    "page": 1
+  }
+}
+```
+
+Notas:
+- El campo `transaction_type` casi siempre dice `"prestamo_valores"`, aunque
+  el movimiento sea claramente un dividendo. **No es un buen discriminador**;
+  usa `transaction_description`.
+- `is_withholding` en el modelo Pydantic detecta los ISR con regex sobre
+  la descripción.
+- Autorización: el mismo Bearer token de Cognito que `api.gbm.com` (probado
+  empíricamente; ambos comparten user pool aunque tengan client_id propio
+  por host).
+
+### Mapeo a UI
+
+| Columna "Dividendos" del web app | Campo de la respuesta |
+|---|---|
+| Fecha | `process_date` (toma la parte de fecha) |
+| Hora | `transaction_time` |
+| Emisora | `security_id` |
+| Descripción | `transaction_description` |
+| Monto | `transaction_amount` (bruto) — el net suele ser igual |
+
+---
+
 ## Pendientes por probar
 
 | Endpoint | Estado | Notas |
 |---|---|---|
 | Refresh token | No probado | `POST /api/v1/session/user/refresh` con `{refreshToken}` |
 | Cancelar orden | No probado | `POST /GBMP/api/Operation/CancelCapitalOrder` |
-| Movimientos de efectivo | Conocido (gbmplus) | `GET /v1/contracts/{main}/accounts/{id}/cash-transactions` |
+| Movimientos de efectivo (otros tipos) | Parcial | `?transac_type=deposit\|transfer_in\|transfer_out` ya conocidos por gbmplus; los demás (`buy`, `sell`, fees) por descubrir |
 | Estado de cuenta PDF | No descubierto | Probable: `/v1/contracts/.../statements` |
 | Catálogo BMV | No descubierto | Análogo a `getMarketsUSA` |
 | Cotizaciones / market data | No descubierto | Probablemente en `homebroker-api` |

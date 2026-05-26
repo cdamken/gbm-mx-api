@@ -6,6 +6,109 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-26
+
+### Added — full transactions ledger
+
+Generalizes the dividend-only view of `api.appgbm.com/v2/.../transactions`
+into a full ledger client that returns **every** movement: stock buys
+and sells, fund buys and sells, repos, cash transfers (deposit /
+withdrawal), FX, and dividend-style entries. This unblocks visibility
+for accounts that `GetBlotterOrders` cannot see (Asesor, Smart Cash) —
+the blotter endpoint is effectively Personal-only.
+
+**API changes:**
+
+- `client.transactions.list_for_range(contract_id, legacy_contract_id, from_date, to_date)`
+  — paginated full-ledger fetch. Same endpoint as `Dividends`, but with
+  no `transac_type` filter (the backend ignores it except for the
+  literal value `"dividend"`).
+- New domain model `Transaction` exported from the package root, with a
+  computed `.category` property classifying each row into one of:
+  `buy_stock`, `sell_stock`, `buy_fund`, `sell_fund`, `repo_buy`,
+  `repo_mature`, `deposit`, `withdrawal`, `fx`, `dividend`,
+  `tax_withholding`, `other`. Convenience helpers `is_buy`, `is_sell`,
+  `is_cash_flow`.
+
+**Discovery notes (`docs/02-endpoints-discovered.md`):**
+
+- `transac_type` is essentially ignored by the backend except for the
+  literal value `"dividend"`. Filter on the response side using
+  `transaction_type` + `sub_transaction_type` + `transaction_description`.
+- `GetBlotterOrders` (homebroker-api) does NOT support secondary
+  accounts. Passing the secondary account's `legacy_account_id` as
+  `contractId` returns 0 items, and passing the `accountId` UUID
+  alongside is also ignored. The blotter is effectively Personal-only.
+
+### Tests
+
+- 78/78 passing (7 new tests for the Transactions client).
+
+## [0.1.6] — 2026-05-22
+
+### Added
+
+- `gbm-mx dividends ls` CLI command — mirrors `orders ls` but for cash
+  distributions. `--include-isr` / `--no-isr` toggles whether ISR
+  withholding rows show up alongside payouts.
+- `Dividend` model is now exported from the package root
+  (`from gbm_mx_api import Dividend`).
+
+### Fixed
+
+- `auth/login.py`: `latitude=0.0` (equator) and `longitude=0.0` (Greenwich
+  meridian) are now treated as valid user-provided values instead of
+  being clobbered by auto-detected geo. Uses explicit ``None`` check.
+- `domain/order.py`: `Order.status_label` now returns Spanish labels
+  (`"Llena"`, `"Cancelada"`) consistent with the rest of the codebase
+  and the GBM web UI. Was returning English (`"Filled"`, `"Cancelled"`).
+- `api/dividends.py`: pagination loop now stops when the backend returns
+  empty `items`, even if `pagination_metadata.next` is still non-empty.
+  Previously could waste up to `_MAX_PAGES` (200) HTTP requests on a
+  misbehaving backend.
+- `auth/session.py`: `Session.try_load()` now logs a warning when the
+  session file exists but is unreadable (permissions, corrupted JSON,
+  schema mismatch after a model bump). A missing file stays silent as
+  before — that's the normal first-run path.
+
+### Changed
+
+- `api/orders.py`: removed two dead `try/except ApiError: raise` blocks
+  in `list_for_range` and `list_filled`. The exception propagates
+  unchanged either way; the dead blocks just added noise.
+
+### Tests
+
+- Still 71/71 (no new tests, but `test_status_label_known_values` was
+  updated to expect the new Spanish labels).
+
+## [0.1.5] — 2026-05-22
+
+### Added — dividend / cash-distribution endpoint
+
+Discovered the data source behind the "Dividendos" tab on the basic
+appgbm.com web app. It lives on a **different backend host**
+(`api.appgbm.com`) from the rest of the API surface we use
+(`api.gbm.com`, `homebroker-api.gbm.com`).
+
+**API changes:**
+
+- `client.dividends.list_for_range(contract_id, legacy_contract_id, from_date, to_date)`
+  — returns every cash-flow GBM classifies as a dividend in the range:
+  cash dividends, capital returns, "Resultado Fiscal Distribuido",
+  matching ISR (tax) withholding lines, etc. Pagination is handled
+  transparently.
+- New `Dividend` Pydantic model with `transaction_id`, `security_id`
+  (ticker), `transaction_amount` / `transaction_net_amount` (MXN),
+  `process_date`, `transaction_description`, plus a convenience
+  `is_withholding` property to tell ISR rows apart from gross payouts.
+
+### Tests
+
+- 71 total (was 65) — 6 new tests covering single-page, pagination,
+  param shape, de-duplication, range validation, and the
+  `is_withholding` property.
+
 ## [0.1.4] — 2026-05-21
 
 ### Changed
@@ -160,7 +263,9 @@ continue to work identically.
 - Python 3.10+.
 - Dependencias mínimas: `httpx`, `pydantic`. CLI extras: `typer`, `rich`.
 
-[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/cdamken/gbm-mx-api/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.6
+[0.1.5]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.5
 [0.1.4]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.4
 [0.1.3]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.3
 [0.1.2]: https://github.com/cdamken/gbm-mx-api/releases/tag/v0.1.2

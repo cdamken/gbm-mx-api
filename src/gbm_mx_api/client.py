@@ -30,8 +30,10 @@ from pathlib import Path
 
 from gbm_mx_api.api.accounts import Accounts
 from gbm_mx_api.api.contracts import Contracts
+from gbm_mx_api.api.dividends import Dividends
 from gbm_mx_api.api.orders import Orders
 from gbm_mx_api.api.positions import Positions
+from gbm_mx_api.api.transactions import Transactions
 from gbm_mx_api.auth.login import TotpProvider
 from gbm_mx_api.auth.login import login as _login
 from gbm_mx_api.auth.session import DEFAULT_SESSION_PATH, Session
@@ -60,6 +62,8 @@ class GbmClient:
         self.accounts = Accounts(self._http)
         self.positions = Positions(self._http)
         self.orders = Orders(self._http)
+        self.dividends = Dividends(self._http)
+        self.transactions = Transactions(self._http)
 
     # ------------------------------------------------------------------
     # Construction
