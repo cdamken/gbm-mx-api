@@ -93,8 +93,16 @@ class Transaction(BaseModel):
         - ``"sell_fund"`` — Venta Soc. de Inv. (mercado_dinero).
         - ``"repo_buy"`` — Compra en Reporto (mercado_dinero).
         - ``"repo_mature"`` — Vencimiento de Reporto (mercado_dinero).
-        - ``"deposit"`` — Depósito de efectivo por traspaso (tesoreria).
-        - ``"withdrawal"`` — Retiro de efectivo por traspaso (tesoreria).
+        - ``"deposit"`` — Depósito de efectivo por traspaso interno
+          (entre cuentas del mismo titular) — sub_transaction_type=3534.
+        - ``"withdrawal"`` — Retiro de efectivo por traspaso interno
+          — sub_transaction_type=3535.
+        - ``"external_deposit"`` — Transferencia recibida desde otra
+          cuenta GBM de un titular DIFERENTE
+          ("Transferencia Recibida GBM", sub_transaction_type=3867).
+          Dinero realmente entrante de afuera.
+        - ``"external_withdrawal"`` — Transferencia enviada a otra
+          cuenta GBM de otro titular (untested — sub probably 3866).
         - ``"fx"`` — Compra/venta de divisas.
         - ``"dividend"`` — Abono Efectivo Dividendo / Reembolso de Capital
           / Resultado Fiscal Distribuido.
@@ -125,6 +133,16 @@ class Transaction(BaseModel):
             if "compra" in desc:
                 return "buy_fund"
         if ttype == "tesoreria":
+            # Cross-titular GBM transfer (e.g. Felicitas → Carlos).
+            # Distinguishable by description ("Transferencia Recibida/Enviada GBM")
+            # AND sub_transaction_type=3867 for received. These are REAL
+            # money flowing in/out from another GBM customer — NOT the
+            # internal traspasos between same-titular accounts.
+            if "recibida" in desc and "gbm" in desc:
+                return "external_deposit"
+            if "enviada" in desc and "gbm" in desc:
+                return "external_withdrawal"
+            # Internal traspasos between the user's own accounts.
             if "deposito" in desc or "depósito" in desc:
                 return "deposit"
             if "retiro" in desc:
@@ -144,6 +162,11 @@ class Transaction(BaseModel):
     @property
     def is_sell(self) -> bool:
         return self.category in ("sell_stock", "sell_fund", "repo_mature")
+
+    @property
+    def is_external_transfer(self) -> bool:
+        """True for cross-titular GBM transfers (real external money)."""
+        return self.category in ("external_deposit", "external_withdrawal")
 
     @property
     def is_cash_flow(self) -> bool:

@@ -6,6 +6,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.2.4] — 2026-06-01
+
+### Added — external transfer categories on Transaction.category
+
+Discovered when investigating a real-world case: a transfer from one
+GBM account holder to a different GBM account holder ("Transferencia
+Recibida GBM", ``sub_transaction_type=3867``) was being miscategorized
+as ``"other"`` because the prior logic only handled the
+``"DEPOSITO/RETIRO POR TRASPASO"`` (same-titular) descriptions.
+
+- New ``Transaction.category`` values:
+  - ``"external_deposit"`` — money received from another GBM customer.
+  - ``"external_withdrawal"`` — money sent to another GBM customer.
+- New helper ``Transaction.is_external_transfer``.
+- Detection is by description (``"recibida"|"enviada"`` + ``"gbm"``);
+  see ``domain/transaction.py:category``.
+
 ## [0.2.3] — 2026-06-01
 
 ### Fixed
