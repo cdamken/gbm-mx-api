@@ -6,6 +6,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.2.6] — 2026-06-01
+
+### Fixed
+
+- ``complete_mfa`` now ALWAYS reclassifies HTTP 422 from the
+  ``/challenge`` endpoint as ``AuthError``, regardless of the response
+  body shape. Previously the classifier required a dict body with
+  ``id: "NotAuthorizedException"``; when GBM returned 422 with a
+  different body (empty, bare string), the error surfaced as a generic
+  ``ApiError`` which the dashboard couldn't recognize as "invalid TOTP"
+  and showed as "API error" instead of reopening the TOTP modal.
+
 ## [0.2.5] — 2026-06-01
 
 ### Fixed

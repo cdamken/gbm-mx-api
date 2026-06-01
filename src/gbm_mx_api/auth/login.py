@@ -162,11 +162,18 @@ def complete_mfa(
                 },
             )
     except ApiError as e:
-        # GBM also returns 422 NotAuthorizedException when the TOTP code
-        # is wrong or expired.
-        if _looks_like_auth_failure(e):
+        # GBM returns 422 NotAuthorizedException when the TOTP code is
+        # wrong or expired. The body shape varies (sometimes a dict with
+        # `id: "NotAuthorizedException"`, sometimes empty, sometimes a
+        # bare string). Since this is the `/challenge` endpoint and the
+        # ONLY thing it does is validate the TOTP, any 422 here MUST be
+        # an MFA-validation failure — promote to AuthError unconditionally.
+        if e.status_code == 422 or _looks_like_auth_failure(e):
+            msg = _auth_error_message(e) if _looks_like_auth_failure(e) else (
+                "TOTP inválido o expirado — intenta de nuevo."
+            )
             raise AuthError(
-                _auth_error_message(e),
+                msg,
                 status_code=e.status_code,
                 body=e.body,
                 request_id=e.request_id,
