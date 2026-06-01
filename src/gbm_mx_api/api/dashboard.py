@@ -39,9 +39,14 @@ class Dashboard(ApiBase):
                 Required by the backend; without it the response is
                 rejected.
         """
+        # This endpoint is consistently slow (5-30 seconds) because it
+        # joins data across the legacy homebroker, the offshore broker,
+        # and live FX. Bump the timeout to 60s so a normal-day fetch
+        # doesn't trip the 15s default.
         body = self._http.get(
             _investments_groups_url(contract_id),
             params={"email": email},
+            timeout=60.0,
         )
         if not isinstance(body, dict):
             raise ApiError(

@@ -6,6 +6,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-06-01
+
+### Fixed
+
+- ``Dashboard.investments_groups`` was timing out with the default 15 s
+  client timeout because the v3 endpoint joins live FX + homebroker +
+  offshore data server-side and can take 20-30 s on a slow path.
+  - ``HttpClient.get`` and ``.post`` now accept an optional ``timeout``
+    kwarg for per-call overrides.
+  - The investments-groups call uses a 60 s timeout.
+
 ## [0.2.2] — 2026-06-01
 
 ### Added — Dashboard "investments-groups" endpoint

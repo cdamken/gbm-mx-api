@@ -80,11 +80,23 @@ class HttpClient:
         """Update or clear the Bearer token used for subsequent calls."""
         self._access_token = token
 
-    def get(self, url: str, *, params: Mapping[str, Any] | None = None) -> Any:
-        return self._request("GET", url, params=params)
+    def get(
+        self,
+        url: str,
+        *,
+        params: Mapping[str, Any] | None = None,
+        timeout: float | None = None,
+    ) -> Any:
+        return self._request("GET", url, params=params, timeout=timeout)
 
-    def post(self, url: str, *, json: Any = None) -> Any:
-        return self._request("POST", url, json=json)
+    def post(
+        self,
+        url: str,
+        *,
+        json: Any = None,
+        timeout: float | None = None,
+    ) -> Any:
+        return self._request("POST", url, json=json, timeout=timeout)
 
     # ------------------------------------------------------------------
     # Internals
@@ -99,6 +111,7 @@ class HttpClient:
         *,
         params: Mapping[str, Any] | None = None,
         json: Any = None,
+        timeout: float | None = None,
     ) -> Any:
         headers = self._auth_headers()
         log.debug(
@@ -111,11 +124,17 @@ class HttpClient:
 
         attempt = 0
         last_exc: Exception | None = None
+        # Per-call timeout override (e.g. the v3 dashboard endpoint is slow).
+        call_kwargs: dict[str, Any] = {
+            "headers": headers,
+            "params": params,
+            "json": json,
+        }
+        if timeout is not None:
+            call_kwargs["timeout"] = timeout
         while True:
             try:
-                response = self._client.request(
-                    method, url, headers=headers, params=params, json=json
-                )
+                response = self._client.request(method, url, **call_kwargs)
             except httpx.HTTPError as exc:
                 last_exc = exc
                 if attempt < self._max_retries and method in ("GET", "HEAD"):
