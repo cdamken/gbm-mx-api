@@ -6,6 +6,35 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-06-01
+
+### Added — Dashboard "investments-groups" endpoint
+
+Discovered via HAR export: the GBM mobile app's "TOTAL INVERTIDO" number
+comes from ``GET https://api.appgbm.com/v3/dashboard/contracts/{id}/investments-groups?email={email}``
+which returns server-computed group balances using the "live" FX rate.
+
+This endpoint and the legacy ``/GBMP/Portfolio/GetPositionSummary`` use
+DIFFERENT FX rates for USD-denominated holdings (notably Trading USA's
+fractional shares). On a portfolio with ~$28k USD in DRAM the two
+diverge by ~$1,000 MXN over a typical day. This v3 endpoint matches
+what the user sees in the GBM mobile app to the cent.
+
+**API changes:**
+
+- New ``client.dashboard.investments_groups(contract_id, email)``.
+- New domain models ``InvestmentsGroups``, ``Group`` (with optional
+  per-currency ``positions`` for offshore holdings).
+- Exported at the package root.
+
+**Group types observed:** ``smart_cash``, ``smart_cash_usd``,
+``instruments`` (= Trading MX), ``offshore`` (= Trading USA),
+``goals`` (= GBM Advisory).
+
+### Tests
+
+- 80/80 passing (2 new for Dashboard).
+
 ## [0.2.1] — 2026-06-01
 
 ### Added — appgbm.com dashboard accounts endpoint

@@ -11,6 +11,7 @@ import respx
 
 from gbm_mx_api.api.accounts import Accounts
 from gbm_mx_api.api.contracts import Contracts
+from gbm_mx_api.api.dashboard import Dashboard
 from gbm_mx_api.api.dividends import Dividends
 from gbm_mx_api.api.orders import Orders
 from gbm_mx_api.api.positions import Positions
@@ -23,6 +24,7 @@ from tests.fixtures import (
     BLOTTER_TWO_ORDERS,
     CONTRACTS_RESPONSE,
     DIVIDENDS_THREE_ITEMS,
+    INVESTMENTS_GROUPS_RESPONSE,
     POSITION_SUMMARY_RESPONSE,
     TRANSACTIONS_MIXED,
     blotter_response,
@@ -495,3 +497,45 @@ def test_transaction_is_buy_is_sell_is_cash_flow() -> None:
     assert by_id[1008].is_cash_flow is True
     assert by_id[1009].is_cash_flow is False  # fx is its own bucket
     assert by_id[1010].is_buy is False and by_id[1010].is_sell is False
+
+
+# ----------------------------------------------------------------------
+# Dashboard (investments-groups)
+# ----------------------------------------------------------------------
+INVESTMENTS_GROUPS_URL = (
+    f"https://api.appgbm.com/v3/dashboard/contracts/{CONTRACT_ID}/investments-groups"
+)
+
+
+@respx.mock
+def test_dashboard_investments_groups(http: HttpClient) -> None:
+    respx.get(INVESTMENTS_GROUPS_URL).mock(
+        return_value=httpx.Response(200, json=INVESTMENTS_GROUPS_RESPONSE)
+    )
+    out = Dashboard(http).investments_groups(CONTRACT_ID, email="user@example.com")
+    assert out.total_position.amount == Decimal("804219.64")
+    assert out.total_position.currency == "MXN"
+    assert len(out.groups) == 4
+    by_type = {g.type: g for g in out.groups}
+    assert "offshore" in by_type
+    assert by_type["offshore"].position is not None
+    assert by_type["offshore"].position.amount == Decimal("501517.02")
+    # Trading USA has per-currency breakdown
+    assert by_type["offshore"].positions is not None
+    assert by_type["offshore"].positions["USD"].amount == Decimal("28862.13")
+
+
+@respx.mock
+def test_dashboard_investments_groups_sends_email_param(http: HttpClient) -> None:
+    captured: dict[str, object] = {}
+
+    def _capture(request: httpx.Request) -> httpx.Response:
+        captured["params"] = dict(request.url.params)
+        return httpx.Response(200, json=INVESTMENTS_GROUPS_RESPONSE)
+
+    respx.get(INVESTMENTS_GROUPS_URL).mock(side_effect=_capture)
+    Dashboard(http).investments_groups(CONTRACT_ID, email="user@example.com")
+
+    params = captured["params"]
+    assert isinstance(params, dict)
+    assert params["email"] == "user@example.com"

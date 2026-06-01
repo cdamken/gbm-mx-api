@@ -443,3 +443,52 @@ TRANSACTIONS_MIXED: dict = dividends_page(
     page=1,
     has_next=False,
 )
+
+
+# Synthetic /v3/dashboard/.../investments-groups response — mirrors the
+# real shape captured 2026-06-01 via HAR export. Anonymized amounts.
+INVESTMENTS_GROUPS_RESPONSE: dict = {
+    "total_position": {"amount": 804219.64, "currency": "MXN"},
+    "groups": [
+        {
+            "name": "Smart Cash",
+            "position": {"amount": 0, "currency": "MXN"},
+            "plus_minus": {"amount": 74.81, "currency": "MXN"},
+            "plus_minus_percentage": 0.0425,
+            "type": "smart_cash",
+            "status": "active",
+        },
+        {
+            "name": "Smart Cash Dólares",
+            "position": {"amount": 0, "currency": "MXN"},
+            "positions": {
+                "MXN": {"amount": 0, "currency": "MXN"},
+                "USD": {"amount": 0, "currency": "USD"},
+            },
+            "plus_minus": {"amount": 0, "currency": "MXN"},
+            "plus_minus_percentage": 0,
+            "type": "smart_cash_usd",
+            "status": "active",
+        },
+        {
+            "name": "Trading MX",
+            "position": {"amount": 302702.62, "currency": "MXN"},
+            "plus_minus": {"amount": 0, "currency": "MXN"},
+            "plus_minus_percentage": 0,
+            "type": "instruments",
+            "status": "active",
+        },
+        {
+            "name": "Trading USA",
+            "position": {"amount": 501517.02, "currency": "MXN"},
+            "positions": {
+                "MXN": {"amount": 501517.02, "currency": "MXN"},
+                "USD": {"amount": 28862.13, "currency": "USD"},
+            },
+            "plus_minus": {"amount": 0, "currency": "MXN"},
+            "plus_minus_percentage": 0,
+            "type": "offshore",
+            "status": "active",
+        },
+    ],
+}

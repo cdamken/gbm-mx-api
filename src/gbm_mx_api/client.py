@@ -30,6 +30,7 @@ from pathlib import Path
 
 from gbm_mx_api.api.accounts import Accounts
 from gbm_mx_api.api.contracts import Contracts
+from gbm_mx_api.api.dashboard import Dashboard
 from gbm_mx_api.api.dividends import Dividends
 from gbm_mx_api.api.orders import Orders
 from gbm_mx_api.api.positions import Positions
@@ -64,6 +65,7 @@ class GbmClient:
         self.orders = Orders(self._http)
         self.dividends = Dividends(self._http)
         self.transactions = Transactions(self._http)
+        self.dashboard = Dashboard(self._http)
 
     # ------------------------------------------------------------------
     # Construction

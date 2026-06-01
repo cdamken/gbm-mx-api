@@ -19,6 +19,7 @@ from gbm_mx_api.domain.enums import (
     PositionValueType,
     Side,
 )
+from gbm_mx_api.domain.investments_groups import Group, InvestmentsGroups
 from gbm_mx_api.domain.order import FilledOrder, Order
 from gbm_mx_api.domain.position import PortfolioSummary, Position
 from gbm_mx_api.domain.transaction import Transaction
@@ -29,7 +30,9 @@ __all__ = [
     "Contract",
     "Dividend",
     "FilledOrder",
+    "Group",
     "InstrumentType",
+    "InvestmentsGroups",
     "Money",
     "Order",
     "OrderStatus",
