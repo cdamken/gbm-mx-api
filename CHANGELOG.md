@@ -6,6 +6,20 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.2.5] — 2026-06-01
+
+### Fixed
+
+- Transient DNS or TCP connect failures on POST endpoints (notably
+  ``/api/v1/session/user`` during login) were not retried, surfacing as
+  a hard ``TransportError`` like ``[Errno -3] Temporary failure in name
+  resolution``. These errors happen BEFORE the request leaves the
+  client, so retrying is safe even for non-idempotent verbs.
+  - Connect-time errors (``httpx.ConnectError``, ``ConnectTimeout``)
+    now retry up to ``max_retries`` for every HTTP method.
+  - Read timeouts on writes still don't retry (the server may have
+    processed the request even though we missed the response).
+
 ## [0.2.4] — 2026-06-01
 
 ### Added — external transfer categories on Transaction.category
