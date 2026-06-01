@@ -6,6 +6,36 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-06-01
+
+### Added — appgbm.com dashboard accounts endpoint
+
+Discovered via DevTools on www.appgbm.com that the legacy
+``api.gbm.com/v2/contracts/{id}/accounts`` endpoint **omits** the
+Smart Cash USD account (``management_type_template=wealth``). The
+appgbm.com dashboard uses a different endpoint that returns all five
+accounts including the hidden one.
+
+**API changes:**
+
+- ``Account`` now has an ``is_smart_cash_usd: bool`` field.
+- ``client.accounts.list_dashboard(contract_id)`` — calls
+  ``api.appgbm.com/v1/dashboard/contracts/{id}/accounts`` and returns
+  the full list of accounts (metadata only, no balances).
+- ``client.accounts.list_with_dashboard(contract_id)`` — merges the
+  full list from ``list_dashboard`` with the balances from the legacy
+  ``list``. Use this when you want both completeness and balance data.
+
+### Documentation
+
+- ``docs/02-endpoints-discovered.md`` — new section documenting the
+  appgbm.com dashboard endpoints (``/v1/dashboard/contracts/{id}/accounts``,
+  ``/v1/dashboard/parties/{party_uuid}``, the SUNSET endpoint, and the
+  Smart Cash investments-group endpoint that is still undiscovered).
+- Explained that GBM's "TOTAL INVERTIDO" is calculated client-side by
+  summing balances; there is no single endpoint to map.
+- Added a reverse-engineering protocol for future discovery sessions.
+
 ## [0.2.0] — 2026-05-26
 
 ### Added — full transactions ledger

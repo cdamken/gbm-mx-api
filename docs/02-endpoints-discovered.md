@@ -442,3 +442,103 @@ Notas:
 | Constancia fiscal | No descubierto | |
 | Otros valores de `gbmIntProcessStatus` | No descubierto | Necesita más muestras de órdenes |
 | Comportamiento de `bitBuy: false` (Venta) | No validado | |
+
+---
+
+## Endpoints del web app `appgbm.com` (descubiertos 2026-06-01 vía DevTools)
+
+El web app moderno en `https://www.appgbm.com/` usa endpoints específicos
+del dashboard que **no están expuestos** por `api.gbm.com/v2/contracts/{id}/accounts`.
+Para mantener paridad con lo que ve el usuario en la app móvil/web hay que
+mapear estos.
+
+### `GET /v1/dashboard/contracts/{contract_uuid}/accounts`
+
+Host: `api.appgbm.com`. **Devuelve 5 cuentas** (las 4 del endpoint legacy
++ una oculta de tipo `wealth` que es **Smart Cash Dólares**).
+
+```json
+{
+  "data": [
+    {
+      "account_id": "...uuid...",
+      "management_type_template": "trading"      // BMV (Personal, Asesor)
+                                | "trading_usa"  // Trading USA (fractional)
+                                | "smart_cash"   // Smart Cash MXN
+                                | "wealth",      // Smart Cash USD (oculto en v2)
+      "name": "Personal" | "Smart Cash Dólares" | …,
+      "number": 1..5,
+      "legacy_contract_id": "EP47NC01..05",
+      "status": "active",
+      "collecting_account": "601180400…",
+      "created_at": "2026-01-07T15:59:37.250529Z",
+      "is_smart_cash_usd": false | true
+    }
+  ]
+}
+```
+
+**Diferencia clave vs `api.gbm.com/v2/contracts/{id}/accounts`:**
+
+- El v2 legacy devuelve 4 cuentas (omite la de tipo `wealth`).
+- El dashboard devuelve 5, incluyendo Smart Cash Dólares con
+  `is_smart_cash_usd: true`.
+- El dashboard **NO** trae `position.amount` ni `plus_minus` — solo
+  metadata. Para balances hay que combinar con `/v2/` legacy o con
+  `GetPositionSummary`.
+
+### `GET /v1/dashboard/contracts/{contract_uuid}/investments-groups/smart_cash/accounts`
+
+Host: `api.appgbm.com`. Endpoint específico para Smart Cash (probable
+balance + holdings). **Visto en performance.getEntriesByType pero no
+cacheado** — su response no quedó accesible desde JS en el momento de
+discovery. Por descubrir.
+
+### `GET /v1/dashboard/parties/{party_uuid}`
+
+Host: `api.appgbm.com`. Devuelve datos personales del titular (nombre,
+fecha nac., estado civil, `investment_profile`, `risk_type`). El
+`party_uuid` es nuevo — distinto al `contract_uuid` y al `legacy_contract_id`.
+
+### `GET /v1/dashboard/contracts/{contract_uuid}/parties/{party_uuid}/sunset/{email}`
+
+Host: `api.appgbm.com`. Status de migración entre apps:
+`{ "default_app": "AE", "has_gbm_access": false, "show_migration_warning": false, … }`.
+
+### "Total Invertido" se calcula del lado del cliente
+
+El número grande "TOTAL INVERTIDO" que muestra la app móvil/web **no
+viene de un endpoint** — se calcula client-side sumando los balances de
+las 5 cuentas. Verificado leyendo `localStorage` / `sessionStorage` del
+web app: no hay ningún string que contenga el valor total cacheado.
+Esto significa que **no hay nada que añadir a la librería** para
+reproducir ese número: ya lo calculamos igual sumando `account.position.amount`.
+La diferencia observada con la app móvil (~$1,000 sobre ~$800K) es
+**drift intradía**: USD/MXN y precios SIC/USA moviéndose entre el
+momento de nuestro fetch y el momento que la app móvil hace su llamada
+live.
+
+### Reverse-engineering protocol (para sesiones futuras)
+
+Para capturar nuevos endpoints del web app sin proxy:
+
+1. Abrir `https://www.appgbm.com/` logueado.
+2. DevTools → Console → ejecutar:
+   ```js
+   performance.getEntriesByType('resource')
+     .filter(e => /api\.(app)?gbm/i.test(e.name))
+     .map(e => e.name);
+   ```
+3. Para responses cacheados:
+   ```js
+   const all = {};
+   for (const k of Object.keys(sessionStorage)) {
+     if (k.startsWith('gbm-cache-')) all[k.replace('gbm-cache-','')] = JSON.parse(sessionStorage[k]);
+   }
+   ```
+4. Para endpoints que no se cachean: instalar un interceptor de
+   `fetch` y `XMLHttpRequest.send` que vuelque a `window.__captured`,
+   navegar la SPA para forzar la request, leer `__captured`.
+   La fetch CORS-cross-origin desde DevTools console **falla** sin el
+   Bearer token de la app, así que NO se puede hacer `fetch(url)` a
+   mano — hay que pasar por los interceptors.

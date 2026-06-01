@@ -41,3 +41,11 @@ class Account(BaseModel):
     collecting_account: str | None = None
     profile_type: str | None = None
     created_at: datetime | None = None
+    is_smart_cash_usd: bool = Field(
+        default=False,
+        description=(
+            "True for the Smart Cash Dólares account (management_type_template="
+            "'wealth'). Returned only by the appgbm.com dashboard endpoint; "
+            "absent / False on responses from the legacy api.gbm.com/v2 endpoint."
+        ),
+    )
