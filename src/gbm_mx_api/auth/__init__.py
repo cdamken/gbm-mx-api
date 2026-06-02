@@ -18,7 +18,7 @@ from gbm_mx_api.auth.login import (
     login,
     start_login,
 )
-from gbm_mx_api.auth.refresh import refresh_session
+from gbm_mx_api.auth.refresh import global_signout, refresh_session
 from gbm_mx_api.auth.session import Session
 
 __all__ = [
@@ -26,6 +26,7 @@ __all__ = [
     "Session",
     "complete_mfa",
     "detect_geo",
+    "global_signout",
     "login",
     "refresh_session",
     "start_login",

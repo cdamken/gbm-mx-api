@@ -9,7 +9,7 @@ import httpx
 import pytest
 import respx
 
-from gbm_mx_api.auth.refresh import COGNITO_URL, refresh_session
+from gbm_mx_api.auth.refresh import COGNITO_URL, global_signout, refresh_session
 from gbm_mx_api.auth.session import Session
 from gbm_mx_api.client import GbmClient
 from gbm_mx_api.errors import AuthError, TransportError
@@ -143,3 +143,34 @@ def test_from_saved_returns_none_when_expired_without_refresh_token(
     _session(obtained_at=int(time.time()) - 4000, refresh_token=None).save(path)
 
     assert GbmClient.from_saved(path) is None
+
+
+# ---------------------------------------------------------------------
+# global_signout
+# ---------------------------------------------------------------------
+@respx.mock
+def test_global_signout_success() -> None:
+    respx.post(COGNITO_URL).mock(return_value=httpx.Response(200, json={}))
+    # Should not raise.
+    global_signout(_session())
+
+
+def test_global_signout_without_access_token() -> None:
+    s = _session(access_token="")
+    with pytest.raises(AuthError):
+        global_signout(s)
+
+
+@respx.mock
+def test_global_signout_rejected_access_token() -> None:
+    respx.post(COGNITO_URL).mock(
+        return_value=httpx.Response(
+            400,
+            json={
+                "__type": "NotAuthorizedException",
+                "message": "Access Token has expired",
+            },
+        )
+    )
+    with pytest.raises(AuthError):
+        global_signout(_session())

@@ -6,6 +6,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-06-02
+
+### Added
+
+- ``gbm_mx_api.auth.global_signout(session)``: revoke the session
+  server-side via Cognito GlobalSignOut. Invalidates the access token
+  AND the refresh token across every device. Useful for true
+  "log out everywhere" (stolen device, shared session by accident).
+  Requires a non-expired access token — caller should ``refresh_session``
+  first if needed.
+
 ## [0.3.0] — 2026-06-02
 
 ### Added

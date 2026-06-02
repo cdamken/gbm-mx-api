@@ -45,6 +45,7 @@ log = logging.getLogger(__name__)
 COGNITO_CLIENT_ID = "6eptudi9rs762jtc50ktjb16nl"
 COGNITO_URL = "https://cognito-idp.us-east-1.amazonaws.com/"
 COGNITO_TARGET = "AWSCognitoIdentityProviderService.InitiateAuth"
+COGNITO_SIGNOUT_TARGET = "AWSCognitoIdentityProviderService.GlobalSignOut"
 
 DEFAULT_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
@@ -121,3 +122,55 @@ def refresh_session(session: Session, *, timeout: httpx.Timeout = DEFAULT_TIMEOU
             "obtained_at": int(time.time()),
         }
     )
+
+
+def global_signout(session: Session, *, timeout: httpx.Timeout = DEFAULT_TIMEOUT) -> None:
+    """Revoke the session server-side via Cognito GlobalSignOut.
+
+    Invalidates the access token AND the refresh token for this user
+    across every device. Useful for a true "log out everywhere" — e.g.
+    the user's laptop was stolen and they want to make sure the cached
+    refresh token can never mint another access token.
+
+    After this returns, the local session.json is effectively dead and
+    should be deleted by the caller; any further API call will get a
+    401 from GBM and the user must re-login from scratch (full TOTP).
+
+    Raises:
+        AuthError: when Cognito rejects the signout (most commonly,
+            the access token is already expired — in which case the
+            session is already partly dead anyway).
+        TransportError: on network failure talking to Cognito.
+
+    Note: requires a *valid* (non-expired) access token. If your stored
+    session is expired, call refresh_session() first to mint a fresh
+    one, then call global_signout(). Otherwise Cognito returns
+    NotAuthorizedException ("Access Token has expired").
+    """
+    if not session.access_token:
+        raise AuthError("No access token in session; cannot sign out.", status_code=0)
+
+    try:
+        response = httpx.post(
+            COGNITO_URL,
+            headers={
+                "Content-Type": "application/x-amz-json-1.1",
+                "X-Amz-Target": COGNITO_SIGNOUT_TARGET,
+            },
+            json={"AccessToken": session.access_token},
+            timeout=timeout,
+        )
+    except httpx.HTTPError as exc:
+        raise TransportError(f"POST {COGNITO_URL} GlobalSignOut: {exc}") from exc
+
+    if response.status_code != 200:
+        body: object = response.text
+        with contextlib.suppress(ValueError):
+            body = response.json()
+        type_ = body.get("__type") if isinstance(body, dict) else None
+        msg = (
+            body.get("message") or body.get("Message") if isinstance(body, dict) else None
+        ) or f"Cognito GlobalSignOut failed: HTTP {response.status_code}"
+        log.info("global_signout failed: %s (%s)", type_ or "?", msg)
+        raise AuthError(msg, status_code=response.status_code, body=body)
+    # Success: response body is `{}` per Cognito spec — nothing to return.
