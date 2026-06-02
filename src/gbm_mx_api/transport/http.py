@@ -147,9 +147,7 @@ class HttpClient:
                 #     processed the request even though we didn't get the
                 #     response.
                 is_idempotent = method in ("GET", "HEAD")
-                is_connect_error = isinstance(
-                    exc, (httpx.ConnectError, httpx.ConnectTimeout)
-                )
+                is_connect_error = isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout))
                 if attempt < self._max_retries and (is_idempotent or is_connect_error):
                     attempt += 1
                     time.sleep(min(2**attempt, 5))

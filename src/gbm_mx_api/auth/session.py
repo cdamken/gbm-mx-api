@@ -33,7 +33,11 @@ class Session(BaseModel):
         default=None, description="Cognito ID token (JWT with user claims)."
     )
     refresh_token: str | None = Field(
-        default=None, description="Refresh token (use not yet implemented)."
+        default=None,
+        description=(
+            "Cognito refresh token. Used by gbm_mx_api.auth.refresh.refresh_session"
+            " to mint a new access token without re-prompting for TOTP."
+        ),
     )
     token_type: str = Field(default="Bearer")
     expires_in: int = Field(

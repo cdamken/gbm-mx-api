@@ -26,6 +26,7 @@ it. Typical usage::
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 
 from gbm_mx_api.api.accounts import Accounts
@@ -37,8 +38,9 @@ from gbm_mx_api.api.positions import Positions
 from gbm_mx_api.api.transactions import Transactions
 from gbm_mx_api.auth.login import TotpProvider
 from gbm_mx_api.auth.login import login as _login
+from gbm_mx_api.auth.refresh import refresh_session
 from gbm_mx_api.auth.session import DEFAULT_SESSION_PATH, Session
-from gbm_mx_api.errors import GbmError
+from gbm_mx_api.errors import AuthError, GbmError, TransportError
 from gbm_mx_api.transport.http import HttpClient
 
 
@@ -101,12 +103,30 @@ class GbmClient:
     def from_saved(cls, path: Path = DEFAULT_SESSION_PATH) -> GbmClient | None:
         """Load a persisted session if present and still valid.
 
-        Returns ``None`` if no usable session exists. The caller can then
-        decide to call :meth:`login` interactively.
+        If the access token has expired but a refresh token is available,
+        try to mint a new access token silently via Cognito's
+        ``REFRESH_TOKEN_AUTH`` flow. On success the refreshed session is
+        persisted back to ``path``. On failure (refresh token revoked,
+        Cognito unreachable, etc.) returns ``None`` so the caller falls
+        back to interactive :meth:`login`.
         """
         session = Session.try_load(path)
-        if session is None or session.is_expired:
+        if session is None:
             return None
+        if session.is_expired:
+            if not session.refresh_token:
+                return None
+            try:
+                session = refresh_session(session)
+            except (AuthError, TransportError):
+                # Refresh token revoked / Cognito down / network blip —
+                # the caller will prompt for TOTP and re-login fully.
+                return None
+            # If we can't persist (read-only fs, perms), proceed with the
+            # in-memory session so this run still works; next run will
+            # refresh again.
+            with contextlib.suppress(OSError):
+                session.save(path)
         return cls(session)
 
     # ------------------------------------------------------------------

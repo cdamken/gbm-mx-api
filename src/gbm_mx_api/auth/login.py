@@ -169,8 +169,10 @@ def complete_mfa(
         # ONLY thing it does is validate the TOTP, any 422 here MUST be
         # an MFA-validation failure — promote to AuthError unconditionally.
         if e.status_code == 422 or _looks_like_auth_failure(e):
-            msg = _auth_error_message(e) if _looks_like_auth_failure(e) else (
-                "TOTP inválido o expirado — intenta de nuevo."
+            msg = (
+                _auth_error_message(e)
+                if _looks_like_auth_failure(e)
+                else ("TOTP inválido o expirado — intenta de nuevo.")
             )
             raise AuthError(
                 msg,

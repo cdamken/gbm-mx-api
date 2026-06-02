@@ -6,6 +6,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-02
+
+### Added
+
+- ``gbm_mx_api.auth.refresh_session(session)``: silent refresh via Cognito
+  ``REFRESH_TOKEN_AUTH``. Mints a new access/identity token using the
+  ``refresh_token`` stored in the session — no TOTP prompt required.
+  The refresh token itself stays valid for ~30 days (Cognito default),
+  so users now go from "TOTP every hour" to "TOTP roughly once a month".
+- ``GbmClient.from_saved()`` now auto-refreshes expired sessions when a
+  refresh token is available. If the refresh succeeds, the refreshed
+  session is persisted back to disk. If it fails (token revoked, Cognito
+  down), returns ``None`` so the caller can fall back to interactive
+  TOTP login. This was the long-pending #1 v0.2 follow-up item.
+
 ## [0.2.6] — 2026-06-01
 
 ### Fixed
