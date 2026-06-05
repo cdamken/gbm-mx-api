@@ -16,8 +16,6 @@ jobs:
         with:
           python-version: '3.11'
       - name: install package + test deps
-        run: |
-          python3 -m pip install -e .
-          python3 -m pip install pytest
+        run: python3 -m pip install -e ".[dev]"
       - name: run tests
         run: python3 -m pytest tests/ -v
