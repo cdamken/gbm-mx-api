@@ -58,6 +58,25 @@ def detect_geo(timeout: float = 5.0) -> tuple[float, float]:
     return DEFAULT_LATITUDE, DEFAULT_LONGITUDE
 
 
+def _resolve_geo(
+    latitude: float | None, longitude: float | None
+) -> tuple[float, float]:
+    """Fill in missing coordinates from detect_geo().
+
+    `... or ...` would treat 0.0 (the equator / Greenwich meridian) as
+    "missing" and overwrite a valid user-provided value — so this tests
+    explicit None instead. Shared by start_login / complete_mfa / login,
+    which used to carry three identical copies of this logic.
+    """
+    if latitude is not None and longitude is not None:
+        return latitude, longitude
+    lat, lon = detect_geo()
+    return (
+        lat if latitude is None else latitude,
+        lon if longitude is None else longitude,
+    )
+
+
 def start_login(
     email: str,
     password: str,
@@ -77,13 +96,7 @@ def start_login(
         ApiError: on other 4xx/5xx.
         MfaRequired: when 2FA is required (the common case).
     """
-    if latitude is None or longitude is None:
-        lat, lon = detect_geo()
-        # `... or ...` would treat 0.0 (the equator / Greenwich meridian)
-        # as "missing" and overwrite it with detected geo. Test explicit
-        # None instead so 0.0 stays as a valid user-provided value.
-        latitude = lat if latitude is None else latitude
-        longitude = lon if longitude is None else longitude
+    latitude, longitude = _resolve_geo(latitude, longitude)
 
     try:
         with HttpClient(latitude=latitude, longitude=longitude) as http:
@@ -141,13 +154,7 @@ def complete_mfa(
     if not (isinstance(code, str) and code.isdigit() and len(code) == 6):
         raise ValueError("TOTP code must be a 6-digit string.")
 
-    if latitude is None or longitude is None:
-        lat, lon = detect_geo()
-        # `... or ...` would treat 0.0 (the equator / Greenwich meridian)
-        # as "missing" and overwrite it with detected geo. Test explicit
-        # None instead so 0.0 stays as a valid user-provided value.
-        latitude = lat if latitude is None else latitude
-        longitude = lon if longitude is None else longitude
+    latitude, longitude = _resolve_geo(latitude, longitude)
 
     try:
         with HttpClient(latitude=latitude, longitude=longitude) as http:
@@ -217,13 +224,7 @@ def login(
         )
         session.save()
     """
-    if latitude is None or longitude is None:
-        lat, lon = detect_geo()
-        # `... or ...` would treat 0.0 (the equator / Greenwich meridian)
-        # as "missing" and overwrite it with detected geo. Test explicit
-        # None instead so 0.0 stays as a valid user-provided value.
-        latitude = lat if latitude is None else latitude
-        longitude = lon if longitude is None else longitude
+    latitude, longitude = _resolve_geo(latitude, longitude)
 
     try:
         return start_login(

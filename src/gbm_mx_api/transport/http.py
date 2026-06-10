@@ -212,9 +212,12 @@ def _parse_body(response: httpx.Response) -> Any:
 
 
 def _safe_body(response: httpx.Response) -> Any:
+    # Only parse/decode failures fall back to truncated text — anything
+    # else (programming errors) should propagate, not get silently
+    # converted into a 500-char string.
     try:
         return _parse_body(response)
-    except Exception:
+    except (ValueError, UnicodeDecodeError):
         return response.text[:500]
 
 
