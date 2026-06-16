@@ -91,6 +91,35 @@ gbm-mx-api/                            # repo público
   - **Acepta fechas pasadas** (gbmplus las hardcodeaba a hoy — era el bloqueador).
   - El rango from/to NO se honra → iteramos día por día en `list_filled`.
 
+### Disponibilidad de datos por cuenta (confirmado 2026-06-16)
+
+GBM expone distinto según `management_type_template`:
+
+- **`trading`** (Personal, Asesor) → posiciones + órdenes (`GetBlotterOrders`)
+  + libro (`GetCashHistoricalMovements`). Las acciones de EE.UU. operadas vía
+  **SIC** (`mercados_globales_sic`) viven aquí, dentro de Personal.
+- **`trading_usa`** (cuenta "Trading USA", USD) → **SOLO posiciones**
+  (`GetPositionSummary`, sección `mercado_extranjero`). `GetBlotterOrders` y
+  `GetCashHistoricalMovements` devuelven **0** para esta cuenta (confirmado
+  consultándolos, no asumido). Las posiciones vienen **en pesos** (sin campo
+  USD/FX). Snapshot = lo liquidado (US T+1/T+2).
+- **`smart_cash`** / **`wealth`** (Smart Cash, Smart Cash Dólares) → posiciones
+  + libro.
+
+Implicación: la venta/compra de Trading USA NO se puede listar en
+Órdenes/Libro vía estos endpoints — falta descubrir el endpoint USA (Fase 0,
+diferido). Ver ADR `2026-06-16 — GBM — Modelo de datos por cuenta` en
+Portfolio-Master/DECISIONS.md.
+
+### Sesión / refresh (confirmado 2026-06-16)
+
+El **access token de GBM dura mucho menos que el `expires_in: 3600`** que
+guardamos: GBM lo 401ea aunque `is_expired` lo crea válido (no es por login
+concurrente). Por eso los consumidores deben **refrescar proactivamente desde
+el `refresh_token`** (dura ~días) en cada corrida sin-TOTP, en vez de confiar
+en el reloj local — si no, entra en un loop de re-pedir TOTP. El
+`refresh_token` solo se cae si está revocado de verdad.
+
 ### Mapping Order → Portfolio.md
 - `sob_id` (9 dígitos) → ID que coincide con los IDs de los correos viejos.
 - `gbmIntProcessStatus`: 7 = Llena, 5 = Cancelada (otros valores no descubiertos).
