@@ -6,6 +6,33 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/), versionado
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-06-16
+
+### Added
+
+- ``gbm_mx_api.sync(client, out_dir, *, full=False, email=None, secure=False,
+  log=print)``: the shared fetch orchestration ("núcleo"). Runs the full
+  contracts→accounts→positions→orders→dividends→transactions pipeline and
+  writes ``accounts.json``, ``investments_groups.json``, ``positions.json``,
+  ``fx.json``, ``orders.json``, ``orders_all.json``, ``dividends.json``,
+  ``transactions.json`` and ``last_update.date``. Honors the incremental/full
+  window (``last_update.date`` + a 14-day overlap buffer, merged by unique id),
+  includes Trading USA (``trading_usa``) in the orders pass, and fetches the
+  USD/MXN rate. ``secure=True`` chmods output 0600/0700 for ownCloud per-user
+  dirs.
+- ``gbm_mx_api.try_refresh_saved(session_path=DEFAULT_SESSION_PATH)``:
+  proactively mint a fresh access token from the saved ``refresh_token`` (GBM's
+  access token dies well before the stored ``expires_in``). Returns a usable
+  client, or ``None`` if MFA is required — the caller decides how to surface it.
+
+### Changed
+
+- This release extracts logic that previously lived copy-pasted in
+  ``gbm-dashboard/app/fetch_data.py`` and
+  ``gbm-owncloud/python/fetch_wrapper.py``. Both are now thin host adapters that
+  resolve paths/credentials, map exceptions to exit codes, and call ``sync()``.
+  See ADR ``2026-06-16 — ALL — Núcleo compartido`` (Portfolio-Master) and #2.
+
 ## [0.3.1] — 2026-06-02
 
 ### Added

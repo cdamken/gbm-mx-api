@@ -5,6 +5,7 @@ Public surface — import from here.
 
 from __future__ import annotations
 
+from gbm_mx_api._sync import sync, try_refresh_saved
 from gbm_mx_api._version import __version__
 from gbm_mx_api.auth.session import Session
 from gbm_mx_api.client import GbmClient
@@ -55,4 +56,6 @@ __all__ = [
     "Side",
     "TransportError",
     "__version__",
+    "sync",
+    "try_refresh_saved",
 ]
