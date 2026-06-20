@@ -1,4 +1,4 @@
-"""Tests for the silent Cognito refresh flow."""
+"""Tests for the silent session refresh flow (via auth.gbm.com)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,12 @@ import httpx
 import pytest
 import respx
 
-from gbm_mx_api.auth.refresh import COGNITO_URL, global_signout, refresh_session
+from gbm_mx_api.auth.refresh import (
+    COGNITO_URL,
+    GBM_REFRESH_URL,
+    global_signout,
+    refresh_session,
+)
 from gbm_mx_api.auth.session import Session
 from gbm_mx_api.client import GbmClient
 from gbm_mx_api.errors import AuthError, TransportError
@@ -29,32 +34,43 @@ def _session(**overrides: object) -> Session:
     return Session(**defaults)  # type: ignore[arg-type]
 
 
+def _ok_refresh(**extra: object) -> httpx.Response:
+    body: dict[str, object] = {
+        "accessToken": "new-access",
+        "idToken": "new-identity",
+        "expiresIn": 3600,
+        "tokenType": "Bearer",
+    }
+    body.update(extra)
+    return httpx.Response(200, json=body)
+
+
 @respx.mock
 def test_refresh_session_success() -> None:
-    respx.post(COGNITO_URL).mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "AuthenticationResult": {
-                    "AccessToken": "new-access",
-                    "IdToken": "new-identity",
-                    "ExpiresIn": 3600,
-                    "TokenType": "Bearer",
-                },
-                "ChallengeParameters": {},
-            },
-        )
-    )
+    route = respx.post(GBM_REFRESH_URL).mock(return_value=_ok_refresh())
     s = _session(obtained_at=int(time.time()) - 4000)
     refreshed = refresh_session(s)
 
     assert refreshed.access_token == "new-access"
     assert refreshed.identity_token == "new-identity"
-    # Refresh token must be preserved — Cognito does not return a new one.
+    # No new refresh token in the response → the old one is preserved.
     assert refreshed.refresh_token == "ref-token"
     assert refreshed.is_expired is False
     # Sanity: the original session object was not mutated.
     assert s.access_token == "old-access"
+    # Request shape: PascalCase ClientId + RefreshToken, with geo headers.
+    sent = route.calls.last.request
+    assert b'"ClientId"' in sent.content
+    assert b'"RefreshToken"' in sent.content
+    assert sent.headers.get("device-latitude") == "19.4326"
+
+
+@respx.mock
+def test_refresh_session_rotates_refresh_token() -> None:
+    """auth.gbm.com may return a new refresh token — we must store it."""
+    respx.post(GBM_REFRESH_URL).mock(return_value=_ok_refresh(refreshToken="ref-token-2"))
+    refreshed = refresh_session(_session(obtained_at=int(time.time()) - 4000))
+    assert refreshed.refresh_token == "ref-token-2"
 
 
 def test_refresh_session_without_refresh_token() -> None:
@@ -65,23 +81,17 @@ def test_refresh_session_without_refresh_token() -> None:
 
 @respx.mock
 def test_refresh_session_revoked_token() -> None:
-    respx.post(COGNITO_URL).mock(
-        return_value=httpx.Response(
-            400,
-            json={
-                "__type": "NotAuthorizedException",
-                "message": "Refresh Token has been revoked",
-            },
-        )
+    respx.post(GBM_REFRESH_URL).mock(
+        return_value=httpx.Response(401, json={"title": "Unauthorized", "status": 401})
     )
     with pytest.raises(AuthError) as ei:
         refresh_session(_session())
-    assert "revoked" in str(ei.value).lower()
+    assert ei.value.status_code == 401
 
 
 @respx.mock
 def test_refresh_session_network_error() -> None:
-    respx.post(COGNITO_URL).mock(side_effect=httpx.ConnectError("no route"))
+    respx.post(GBM_REFRESH_URL).mock(side_effect=httpx.ConnectError("no route"))
     with pytest.raises(TransportError):
         refresh_session(_session())
 
@@ -95,20 +105,7 @@ def test_from_saved_refreshes_expired_session(tmp_path: Path) -> None:
     path = tmp_path / "session.json"
     _session(obtained_at=int(time.time()) - 4000).save(path)
 
-    respx.post(COGNITO_URL).mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "AuthenticationResult": {
-                    "AccessToken": "new-access",
-                    "IdToken": "new-identity",
-                    "ExpiresIn": 3600,
-                    "TokenType": "Bearer",
-                },
-                "ChallengeParameters": {},
-            },
-        )
-    )
+    respx.post(GBM_REFRESH_URL).mock(return_value=_ok_refresh())
 
     client = GbmClient.from_saved(path)
     assert client is not None
@@ -122,15 +119,12 @@ def test_from_saved_refreshes_expired_session(tmp_path: Path) -> None:
 
 @respx.mock
 def test_from_saved_returns_none_when_refresh_fails(tmp_path: Path) -> None:
-    """Expired session + refresh rejected by Cognito → None (caller does TOTP)."""
+    """Expired session + refresh rejected by auth.gbm.com → None (caller does TOTP)."""
     path = tmp_path / "session.json"
     _session(obtained_at=int(time.time()) - 4000).save(path)
 
-    respx.post(COGNITO_URL).mock(
-        return_value=httpx.Response(
-            400,
-            json={"__type": "NotAuthorizedException", "message": "revoked"},
-        )
+    respx.post(GBM_REFRESH_URL).mock(
+        return_value=httpx.Response(401, json={"title": "Unauthorized", "status": 401})
     )
 
     assert GbmClient.from_saved(path) is None
@@ -146,7 +140,7 @@ def test_from_saved_returns_none_when_expired_without_refresh_token(
 
 
 # ---------------------------------------------------------------------
-# global_signout
+# global_signout (still Cognito GlobalSignOut)
 # ---------------------------------------------------------------------
 @respx.mock
 def test_global_signout_success() -> None:
