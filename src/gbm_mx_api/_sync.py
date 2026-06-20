@@ -174,6 +174,70 @@ def read_last_update_date(data_dir: Path) -> date | None:
         return None
 
 
+def account_start_date(
+    client: GbmClient,
+    contract: Any,
+    accounts: list[Any],
+    out_dir: Path,
+    *,
+    log: Logger = print,
+) -> date | None:
+    """Earliest transaction date across all accounts = the account-open date.
+
+    Why this exists: ``GetBlotterOrders`` is queried DAY BY DAY, so a full
+    orders backfill costs one HTTP call per day in the window *regardless of
+    whether that day has any orders*. A fixed window is wrong both ways — too
+    short truncates real history, too long fires thousands of empty-day calls
+    (10 years x several accounts) and blows the subprocess timeout. Instead we
+    bound the backfill to the account's FIRST real movement: transactions DO
+    honor a date range (paginated, not day-by-day), so one cheap range query
+    per account reveals the earliest ``process_date``.
+
+    The result is cached in ``{out_dir}/account_start.date`` so we discover it
+    once — a later full reload (or a reset) reuses it instead of re-scanning,
+    and a UI that lets the user state when they opened the account can seed
+    this file directly.
+
+    Returns None if no transactions are found (brand-new account or all calls
+    failed); the caller then falls back to its safety-cap window.
+    """
+    cache = out_dir / "account_start.date"
+    if cache.exists():
+        try:
+            cached = date.fromisoformat(cache.read_text(encoding="utf-8").strip()[:10])
+            log(f"  account start: {cached} (cached)")
+            return cached
+        except (OSError, ValueError):
+            pass  # unreadable cache → rediscover
+
+    # Look back a generously wide window only to FIND the floor; the range
+    # query is cheap (server-side pagination), unlike the day-by-day orders.
+    cap_days = int(os.environ.get("GBM_ORDERS_DAYS", "3650"))
+    wide_from = date.today() - timedelta(days=cap_days)
+    earliest: date | None = None
+    for acct in accounts:
+        try:
+            txs = client.transactions.list_for_range(
+                contract.contract_id, acct.legacy_contract_id, wide_from, date.today()
+            )
+        except (ApiError, TransportError) as e:
+            log(f"  account start probe {acct.name}: skipped ({type(e).__name__})")
+            continue
+        for t in txs:
+            pd = t.process_date
+            d = pd.date() if isinstance(pd, datetime) else pd
+            if isinstance(d, date) and (earliest is None or d < earliest):
+                earliest = d
+
+    if earliest is not None:
+        with contextlib.suppress(OSError):
+            cache.write_text(earliest.isoformat() + "\n", encoding="utf-8")
+        log(f"  account start: {earliest} (discovered from transactions)")
+    else:
+        log("  account start: none found (no transactions) — using safety cap")
+    return earliest
+
+
 def merge_records(
     existing_path: Path,
     new_payload: dict[str, Any],
@@ -392,16 +456,18 @@ def sync(
         if incremental:
             from_date_ = incremental_from
         else:
-            # Full backfill window. GetBlotterOrders is queried DAY BY DAY (one
-            # day per call), so this window directly drives how many sequential
-            # HTTP calls a full reload makes (x each trading account). The old
-            # 3650-day (10-year) default meant ~3,650 calls per account even on
-            # a months-old account — mostly empty — blowing past the 180s
-            # ownCloud subprocess timeout and getting SIGKILL'd mid-fetch (which
-            # then looked like a failed/expired TOTP). 200 days covers a young
-            # account with margin; bump GBM_ORDERS_DAYS for an older one.
-            days_back = int(os.environ.get("GBM_ORDERS_DAYS", "200"))
-            from_date_ = to_date_ - timedelta(days=days_back)
+            # Full backfill. GetBlotterOrders is queried DAY BY DAY (one call
+            # per day per account), so the window length = number of sequential
+            # HTTP calls. A fixed window is wrong both ways: too short truncates
+            # real history, too long fires thousands of empty pre-account-open
+            # calls and blows the subprocess timeout. So bound it to the
+            # account's first real movement (earliest transaction), cached in
+            # account_start.date. GBM_ORDERS_DAYS is now only a safety CAP for
+            # the rare case no transactions are found.
+            cap_days = int(os.environ.get("GBM_ORDERS_DAYS", "3650"))
+            floor = to_date_ - timedelta(days=cap_days)
+            start = account_start_date(client, contract, accounts, out_dir, log=log)
+            from_date_ = max(start, floor) if start is not None else floor
         log(
             f"  fetching orders {from_date_} → {to_date_} "
             f"for {len(trading_accounts)} trading account(s)..."
