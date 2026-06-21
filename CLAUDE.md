@@ -111,14 +111,34 @@ Implicación: la venta/compra de Trading USA NO se puede listar en
 diferido). Ver ADR `2026-06-16 — GBM — Modelo de datos por cuenta` en
 Portfolio-Master/DECISIONS.md.
 
-### Sesión / refresh (confirmado 2026-06-16)
+### Sesión / refresh (REVISADO 2026-06-20 — v0.4.2)
 
 El **access token de GBM dura mucho menos que el `expires_in: 3600`** que
-guardamos: GBM lo 401ea aunque `is_expired` lo crea válido (no es por login
-concurrente). Por eso los consumidores deben **refrescar proactivamente desde
-el `refresh_token`** (dura ~días) en cada corrida sin-TOTP, en vez de confiar
-en el reloj local — si no, entra en un loop de re-pedir TOTP. El
-`refresh_token` solo se cae si está revocado de verdad.
+guardamos: GBM lo 401ea aunque `is_expired` lo crea válido. Por eso hay que
+**refrescar proactivamente** en cada corrida sin-TOTP, no confiar en el reloj.
+
+**PERO el refresh DEBE ir por `auth.gbm.com`, NO por Cognito directo.** Un
+`REFRESH_TOKEN_AUTH` contra `cognito-idp.us-east-1.amazonaws.com` sí emite un
+access token sintácticamente válido, pero **`api.gbm.com` lo rechaza (401)**:
+GBM ata la autorización de la API a la sesión que `auth.gbm.com` crea en el
+**login**, y un refresh directo a Cognito nunca la recrea → el refresh
+"funciona" (Cognito 200) pero la primera llamada a la API 401ea → se borra la
+sesión → vuelve a pedir TOTP. Loop infinito. (Esto fue lo que le pasó a carlos
+y a FELIDRG; no era anti-fraude.)
+
+**Refresh correcto** (`auth/refresh.py::refresh_session`, descubierto probando
+el endpoint el 2026-06-20):
+
+    POST https://auth.gbm.com/api/v1/session/user/refresh
+    Content-Type: application/json
+    device-latitude / device-longitude        (anti-fraude, obligatorios)
+    {"ClientId": "<client_id>", "RefreshToken": "<refresh_token>"}   ← PascalCase
+
+→ `{accessToken, idToken, refreshToken?(rota), expiresIn, tokenType}` — mismo
+tipo de token que el login, que `api.gbm.com` SÍ acepta. Verificado en vivo
+contra una sesión fresca. El `refresh_token` solo se cae si está revocado de
+verdad (~30 días). `global_signout` sigue usando Cognito GlobalSignOut.
+NO volver al refresh por Cognito.
 
 ### Mapping Order → Portfolio.md
 - `sob_id` (9 dígitos) → ID que coincide con los IDs de los correos viejos.
