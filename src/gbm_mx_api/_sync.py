@@ -696,6 +696,18 @@ def sync(
                 key_fn=lambda r: r.get("transaction_id"),
                 sort_key="process_date",
             )
+        # from_date/to_date above are the REQUESTED window (e.g. a full reload
+        # asks from today-3650d ~ 2016). GBM's /transactions endpoint truncates:
+        # verified 14.10.2026 it returns nothing before 2026-04-01 even when
+        # asked from 2016. Record the ACTUAL range present in the data so the
+        # header stops implying history that the backend never returns.
+        _tx_dates = sorted(
+            str(t.get("process_date") or "")[:10]
+            for t in (tx_file_payload.get("transactions") or [])
+            if t.get("process_date")
+        )
+        tx_file_payload["data_from_date"] = _tx_dates[0] if _tx_dates else None
+        tx_file_payload["data_to_date"] = _tx_dates[-1] if _tx_dates else None
         write_json(out_dir / "transactions.json", tx_file_payload, secure=secure, log=log)
 
     # ISO 8601 UTC with explicit Z — browser JS parses the `Z` and converts to
